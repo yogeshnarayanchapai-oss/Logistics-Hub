@@ -170,18 +170,36 @@ router.get("/dashboard/vendor-comments", requireAuth, async (req, res): Promise<
   const orderMap = new Map(vendorOrders.map(o => [o.id, o.orderCode]));
   const orderIds = vendorOrders.map(o => o.id);
 
+  // All today's comments for vendor orders
   const comments = await db.select().from(orderCommentsTable)
     .where(and(inArray(orderCommentsTable.orderId, orderIds), gte(orderCommentsTable.createdAt, today)))
     .orderBy(desc(orderCommentsTable.createdAt));
 
-  const result = comments.map((c, i) => ({
-    sno: i + 1,
-    id: c.id,
-    orderId: c.orderId,
-    orderCode: orderMap.get(c.orderId) ?? "",
-    comment: c.content,
-    addedOn: c.createdAt.toISOString(),
-  }));
+  // Group by orderId — keep only latest comment per order
+  const latestByOrder = new Map<number, typeof comments[0]>();
+  for (const c of comments) {
+    if (!latestByOrder.has(c.orderId)) latestByOrder.set(c.orderId, c);
+  }
+
+  // Fetch commenter roles
+  const result = await Promise.all(
+    Array.from(latestByOrder.values()).map(async (c, i) => {
+      const [commenter] = await db.select({ role: usersTable.role }).from(usersTable).where(eq(usersTable.id, c.userId));
+      const commenterRole = commenter?.role ?? "unknown";
+      // Pending: if last comment is from rider → vendor needs to reply; if from vendor → rider needs to reply
+      const pendingFor = commenterRole === "rider" ? "vendor" : commenterRole === "vendor" ? "rider" : null;
+      return {
+        sno: i + 1,
+        id: c.id,
+        orderId: c.orderId,
+        orderCode: orderMap.get(c.orderId) ?? "",
+        comment: c.content,
+        addedOn: c.createdAt.toISOString(),
+        commenterRole,
+        pendingFor,
+      };
+    })
+  );
 
   res.json(result);
 });

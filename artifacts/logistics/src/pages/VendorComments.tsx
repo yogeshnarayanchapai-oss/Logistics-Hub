@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Search, MessageSquare, Filter, CornerDownRight } from "lucide-react";
+import { Loader2, Search, MessageSquare, Filter, CornerDownRight, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,8 +28,7 @@ export default function VendorComments() {
 
   const replyMutation = useAddOrderComment({
     mutation: {
-      onSuccess: (_data, variables) => {
-        queryClient.invalidateQueries({ queryKey: ["listVendorComments"] });
+      onSuccess: () => {
         refetch();
         toast({ title: "Reply sent" });
         setReplyTarget(null);
@@ -38,7 +38,7 @@ export default function VendorComments() {
     },
   });
 
-  const filtered = (comments ?? []).filter((c) => {
+  const filtered = (comments ?? []).filter((c: any) => {
     if (!search) return true;
     const s = search.toLowerCase();
     return c.orderCode.toLowerCase().includes(s) || c.comment.toLowerCase().includes(s);
@@ -46,17 +46,36 @@ export default function VendorComments() {
 
   const formatDate = (iso: string) => {
     try {
-      return format(new Date(iso), "MMMM d, yyyy, h:mm aaa");
+      return format(new Date(iso), "MMM d, yyyy, h:mm aaa");
     } catch {
       return iso;
     }
+  };
+
+  const PendingBadge = ({ pendingFor }: { pendingFor: string | null }) => {
+    if (!pendingFor) return null;
+    if (pendingFor === "vendor") {
+      return (
+        <Badge className="gap-1 bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-100 font-medium">
+          <Clock className="h-3 w-3" /> Reply Pending
+        </Badge>
+      );
+    }
+    if (pendingFor === "rider") {
+      return (
+        <Badge className="gap-1 bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-100 font-medium">
+          <Clock className="h-3 w-3" /> Rider Pending
+        </Badge>
+      );
+    }
+    return null;
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Today's Comments</h2>
-        <p className="text-muted-foreground">All order comments added today for your orders.</p>
+        <p className="text-muted-foreground">Latest comment per order — today's activity.</p>
       </div>
 
       <Card>
@@ -65,7 +84,7 @@ export default function VendorComments() {
             <div className="flex items-center gap-2 w-full sm:w-80">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
               <Input
-                placeholder="Search SN / Comment..."
+                placeholder="Search order / comment..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-9"
@@ -96,16 +115,17 @@ export default function VendorComments() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-12 pl-4 font-semibold text-foreground">S.No</TableHead>
+                  <TableHead className="w-10 pl-4 font-semibold text-foreground">#</TableHead>
                   <TableHead className="font-semibold text-foreground">Order</TableHead>
-                  <TableHead className="font-semibold text-foreground">Comment</TableHead>
-                  <TableHead className="font-semibold text-foreground">Added on</TableHead>
+                  <TableHead className="font-semibold text-foreground">Latest Comment</TableHead>
+                  <TableHead className="font-semibold text-foreground">Status</TableHead>
+                  <TableHead className="font-semibold text-foreground whitespace-nowrap">Added on</TableHead>
                   <TableHead className="w-16 text-right pr-4 font-semibold text-foreground">Reply</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c, i) => (
-                  <TableRow key={c.id} className="hover:bg-muted/30">
+                {filtered.map((c: any, i: number) => (
+                  <TableRow key={c.id} className={`hover:bg-muted/30 ${c.pendingFor === "vendor" ? "bg-orange-50/40" : ""}`}>
                     <TableCell className="pl-4 text-muted-foreground">{i + 1}</TableCell>
                     <TableCell>
                       <Link href={`${prefix}/orders/${c.orderId}`}>
@@ -114,8 +134,11 @@ export default function VendorComments() {
                         </span>
                       </Link>
                     </TableCell>
-                    <TableCell className="max-w-sm">
-                      <p className="text-sm leading-snug">{c.comment}</p>
+                    <TableCell className="max-w-xs">
+                      <p className="text-sm leading-snug line-clamp-2">{c.comment}</p>
+                    </TableCell>
+                    <TableCell>
+                      <PendingBadge pendingFor={c.pendingFor} />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(c.addedOn)}

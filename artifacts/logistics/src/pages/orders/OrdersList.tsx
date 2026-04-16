@@ -46,8 +46,8 @@ export default function OrdersList() {
   const [activeSearch, setActiveSearch] = useState("");
 
   // Filters — only applied when no active search
-  const [statusFilter, setStatusFilter] = useState<string>("new");
-  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
@@ -207,7 +207,7 @@ export default function OrdersList() {
                 variant="ghost"
                 size="sm"
                 className="text-muted-foreground h-9 px-2"
-                onClick={() => { setStatusFilter("new"); setDatePreset("all"); setCustomFrom(""); setCustomTo(""); handleFilterChange(); }}
+                onClick={() => { setStatusFilter("all"); setDatePreset("today"); setCustomFrom(""); setCustomTo(""); handleFilterChange(); }}
               >
                 <X className="mr-1 h-3 w-3" /> Reset filters
               </Button>

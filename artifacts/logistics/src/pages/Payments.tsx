@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useListPaymentRequests, useCreatePaymentRequest, useUpdatePaymentRequest, useGetCodSummary, getListPaymentRequestsQueryKey, getGetCodSummaryQueryKey } from "@workspace/api-client-react";
+import { useListPaymentRequests, useCreatePaymentRequest, useUpdatePaymentRequest, useGetCodSummary, useListBankAccounts, getListPaymentRequestsQueryKey, getGetCodSummaryQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, DollarSign, Wallet, CheckCircle, XCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Plus, DollarSign, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -20,8 +22,11 @@ export default function Payments() {
   
   const { data: payments, isLoading } = useListPaymentRequests({ vendorId });
   const { data: codSummary } = useGetCodSummary({ query: { vendorId } });
-  
+  const { data: bankAccounts } = useListBankAccounts({ vendorId }, { query: { enabled: isVendor } });
+
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
+  const [requestNote, setRequestNote] = useState("");
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | "release" | null>(null);
   
@@ -54,12 +59,17 @@ export default function Payments() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = {
-      bankAccountId: Number(formData.get("bankAccountId")),
+      bankAccountId: Number(selectedBankAccountId),
       requestedAmount: Number(formData.get("requestedAmount")),
-      note: formData.get("note") as string || null
+      note: requestNote || null
     };
-
     createMutation.mutate({ data });
+  };
+
+  const openRequestDialog = () => {
+    setSelectedBankAccountId(bankAccounts?.[0]?.id?.toString() ?? "");
+    setRequestNote("");
+    setIsRequestDialogOpen(true);
   };
 
   const handleActionConfirm = (e: React.FormEvent<HTMLFormElement>) => {
@@ -90,7 +100,7 @@ export default function Payments() {
           <p className="text-muted-foreground">Manage COD releases and payment requests.</p>
         </div>
         {isVendor && (
-          <Button onClick={() => setIsRequestDialogOpen(true)} disabled={!codSummary || codSummary.pendingRelease <= 0}>
+          <Button onClick={openRequestDialog} disabled={!codSummary || codSummary.pendingRelease <= 0}>
             <Plus className="mr-2 h-4 w-4" /> Request Payment
           </Button>
         )}
@@ -204,6 +214,74 @@ export default function Payments() {
           )}
         </CardContent>
       </Card>
+
+      {/* Vendor Request Payment Dialog */}
+      <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+        <DialogContent>
+          <form onSubmit={handleRequestSubmit}>
+            <DialogHeader>
+              <DialogTitle>Request Payment</DialogTitle>
+              <DialogDescription>
+                Submit a payment request. Available balance: Rs. {codSummary?.pendingRelease?.toLocaleString() ?? 0}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Pay to Bank Account</Label>
+                {bankAccounts && bankAccounts.length > 0 ? (
+                  <Select value={selectedBankAccountId} onValueChange={setSelectedBankAccountId} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select bank account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map((acc: any) => (
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.bankName} — {acc.accountNumber} ({acc.accountHolder})
+                          {acc.isDefault ? " ★" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-destructive">
+                    No bank accounts linked. Please add one in your Profile first.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Requested Amount (Rs.)</Label>
+                <Input
+                  name="requestedAmount"
+                  type="number"
+                  min={1}
+                  max={codSummary?.pendingRelease}
+                  defaultValue={codSummary?.pendingRelease ?? ""}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Note (Optional)</Label>
+                <Textarea
+                  value={requestNote}
+                  onChange={(e) => setRequestNote(e.target.value)}
+                  placeholder="Any additional notes..."
+                  rows={2}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending || !selectedBankAccountId || !bankAccounts?.length}
+              >
+                {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Submit Request
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Admin Action Dialog */}
       <Dialog open={!!selectedPayment} onOpenChange={(open) => !open && setSelectedPayment(null)}>

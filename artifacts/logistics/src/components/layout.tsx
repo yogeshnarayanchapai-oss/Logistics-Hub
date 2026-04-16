@@ -15,7 +15,8 @@ import {
   Wallet,
   Activity,
   UserCheck,
-  UserCircle
+  UserCircle,
+  BarChart2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export function Layout({ children }: LayoutProps) {
     { name: "Users", href: "/users", icon: Users, roles: ["admin"] },
     { name: "Stock Inventory", href: "/stock", icon: Package, roles: ["admin", "manager", "vendor"] },
     { name: "Payments", href: "/payments", icon: Wallet, roles: ["admin", "manager", "vendor"] },
+    { name: "My Reports", href: "/vendor-report", icon: BarChart2, roles: ["vendor"] },
 
     { name: "Support Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "manager", "vendor", "rider"] },
     { name: "Audit Logs", href: "/audit-logs", icon: Activity, roles: ["admin"] },

@@ -289,8 +289,11 @@ export default function Vendors() {
       deliveryCharge: Number(formData.get("deliveryCharge")),
       status: formData.get("status") as string || "active"
     };
+    const pw = formData.get("password") as string;
     if (!editingVendor) {
-      data.password = formData.get("password") as string;
+      data.password = pw;
+    } else if (pw) {
+      data.password = pw;
     }
     if (editingVendor) {
       updateMutation.mutate({ id: editingVendor.id, data });
@@ -500,13 +503,11 @@ export default function Vendors() {
                   </div>
                 )}
               </div>
-              {!editingVendor && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">Login Password *</Label>
-                  <Input id="password" name="password" type="password" required placeholder="Password for vendor login account" />
-                  <p className="text-xs text-muted-foreground">A login account will be auto-created for this vendor.</p>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="password">{editingVendor ? "New Password (leave blank to keep current)" : "Login Password *"}</Label>
+                <Input id="password" name="password" type="password" required={!editingVendor} placeholder={editingVendor ? "Enter new password to change" : "Password for vendor login account"} />
+                {!editingVendor && <p className="text-xs text-muted-foreground">A login account will be auto-created for this vendor.</p>}
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

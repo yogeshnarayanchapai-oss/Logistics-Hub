@@ -131,13 +131,14 @@ router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res): 
   const id = parseInt(raw, 10);
 
   const updates: Record<string, unknown> = {};
-  const { name, email, phone, role, status, stationId } = req.body;
+  const { name, email, phone, role, status, stationId, password } = req.body;
   if (name) updates.name = name;
   if (email) updates.email = email.toLowerCase();
   if (phone !== undefined) updates.phone = phone;
   if (role) updates.role = role;
   if (status) updates.status = status;
   if (stationId !== undefined) updates.stationId = stationId;
+  if (password) updates.passwordHash = hashPassword(password);
 
   const [user] = await db.update(usersTable).set(updates as any).where(eq(usersTable.id, id)).returning();
   if (!user) { res.status(404).json({ error: "User not found" }); return; }

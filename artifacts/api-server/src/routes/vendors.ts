@@ -96,7 +96,7 @@ router.patch("/vendors/:id", requireAuth, requireRole("admin", "manager"), async
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const updates: Record<string, unknown> = {};
-  const { name, businessName, email, phone, address, vendorCode, deliveryCharge, status, linkUserId } = req.body;
+  const { name, businessName, email, phone, address, vendorCode, deliveryCharge, status, linkUserId, password } = req.body;
   if (name) updates.name = name;
   if (businessName !== undefined) updates.businessName = businessName;
   if (email) updates.email = email;
@@ -116,6 +116,7 @@ router.patch("/vendors/:id", requireAuth, requireRole("admin", "manager"), async
     if (email) userUpdates.email = email.toLowerCase();
     if (phone !== undefined) userUpdates.phone = phone;
     if (status) userUpdates.status = status;
+    if (password) userUpdates.passwordHash = hashPassword(password);
     if (Object.keys(userUpdates).length > 0) {
       await db.update(usersTable).set(userUpdates as any).where(eq(usersTable.id, vendor.userId));
     }

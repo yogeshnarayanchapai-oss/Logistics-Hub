@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { useListVendors, useCreateVendor, useUpdateVendor, useDeleteVendor, getListVendorsQueryKey } from "@workspace/api-client-react";
+import {
+  useListVendors, useCreateVendor, useUpdateVendor, useDeleteVendor, getListVendorsQueryKey,
+  useListBankAccounts, useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount,
+  getListBankAccountsQueryKey,
+} from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -15,9 +19,224 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Store, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Loader2, Plus, Search, Store, Pencil, Trash2, ToggleLeft, ToggleRight, Building, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+
+function VendorBankAccountsDialog({ vendor, open, onClose }: { vendor: any; open: boolean; onClose: () => void }) {
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: accounts, isLoading } = useListBankAccounts(
+    vendor ? { vendorId: vendor.id } : {},
+    { query: { enabled: !!vendor } }
+  );
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListBankAccountsQueryKey() });
+
+  const createMutation = useCreateBankAccount({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Bank account added" }); setIsFormOpen(false); setEditingAccount(null); }
+    }
+  });
+  const updateMutation = useUpdateBankAccount({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Bank account updated" }); setIsFormOpen(false); setEditingAccount(null); }
+    }
+  });
+  const deleteMutation = useDeleteBankAccount({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Bank account removed" }); setDeleteTarget(null); },
+      onError: () => { toast({ title: "Delete failed", variant: "destructive" }); setDeleteTarget(null); }
+    }
+  });
+
+  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const payload = {
+      accountHolderName: fd.get("accountHolderName") as string,
+      bankName: fd.get("bankName") as string,
+      branch: fd.get("branch") as string || null,
+      accountNumber: fd.get("accountNumber") as string,
+      walletMethod: fd.get("walletMethod") as string || null,
+      remarks: fd.get("remarks") as string || null,
+      isDefault: fd.get("isDefault") === "on",
+    };
+    if (editingAccount) {
+      updateMutation.mutate({ id: editingAccount.id, data: payload });
+    } else {
+      createMutation.mutate({ data: { ...payload, vendorId: vendor.id } });
+    }
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5 text-primary" />
+              Bank Accounts — {vendor?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Manage payment accounts linked to this vendor for COD remittance.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-end mb-2">
+            <Button size="sm" onClick={() => { setEditingAccount(null); setIsFormOpen(true); }}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Account
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : !accounts?.length ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p>No bank accounts linked yet.</p>
+              <p className="text-xs mt-1">Add an account to receive COD payments.</p>
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bank / Wallet</TableHead>
+                    <TableHead>Account Holder</TableHead>
+                    <TableHead>Account No.</TableHead>
+                    <TableHead>Branch</TableHead>
+                    <TableHead>Default</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.map((acc) => (
+                    <TableRow key={acc.id}>
+                      <TableCell>
+                        <div className="font-medium">{acc.bankName}</div>
+                        {acc.walletMethod && <div className="text-xs text-muted-foreground">{acc.walletMethod}</div>}
+                      </TableCell>
+                      <TableCell>{acc.accountHolderName}</TableCell>
+                      <TableCell className="font-mono text-sm">{acc.accountNumber}</TableCell>
+                      <TableCell>{acc.branch || "—"}</TableCell>
+                      <TableCell>
+                        {acc.isDefault && (
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">Default</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => { setEditingAccount(acc); setIsFormOpen(true); }}>
+                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteTarget({ id: acc.id, name: acc.bankName })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add / Edit account form */}
+      <Dialog open={isFormOpen} onOpenChange={(o) => { if (!o) { setIsFormOpen(false); setEditingAccount(null); } }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <form onSubmit={handleSave}>
+            <DialogHeader>
+              <DialogTitle>{editingAccount ? "Edit Bank Account" : "Add Bank Account"}</DialogTitle>
+              <DialogDescription>
+                {editingAccount ? "Update account details below." : `Add a new account for ${vendor?.name}.`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="ba-bankName">Bank / Wallet Name *</Label>
+                <Input id="ba-bankName" name="bankName" defaultValue={editingAccount?.bankName} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ba-accountHolderName">Account Holder Name *</Label>
+                <Input id="ba-accountHolderName" name="accountHolderName" defaultValue={editingAccount?.accountHolderName} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ba-accountNumber">Account Number *</Label>
+                <Input id="ba-accountNumber" name="accountNumber" defaultValue={editingAccount?.accountNumber} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ba-branch">Branch</Label>
+                  <Input id="ba-branch" name="branch" defaultValue={editingAccount?.branch} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ba-walletMethod">Wallet Method</Label>
+                  <Input id="ba-walletMethod" name="walletMethod" placeholder="e.g. eSewa" defaultValue={editingAccount?.walletMethod} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ba-remarks">Remarks</Label>
+                <Input id="ba-remarks" name="remarks" defaultValue={editingAccount?.remarks} />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox" id="ba-isDefault" name="isDefault"
+                  defaultChecked={editingAccount?.isDefault}
+                  className="h-4 w-4 rounded border-gray-300 text-primary"
+                />
+                <Label htmlFor="ba-isDefault" className="font-normal cursor-pointer">Set as default account</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setEditingAccount(null); }}>Cancel</Button>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Bank Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove <strong>{deleteTarget?.name}</strong> from this vendor's accounts?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
 
 export default function Vendors() {
   const { user } = useAuth();
@@ -32,6 +251,7 @@ export default function Vendors() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [bankVendor, setBankVendor] = useState<any>(null);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -176,6 +396,13 @@ export default function Vendors() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost" size="sm"
+                              className="text-blue-600 hover:text-blue-700"
+                              onClick={() => setBankVendor(vendor)}
+                            >
+                              <Building className="h-3.5 w-3.5 mr-1" /> Banks
+                            </Button>
                             {canManage && (
                               <Button variant="ghost" size="sm" onClick={() => { setEditingVendor(vendor); setIsDialogOpen(true); }}>
                                 <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
@@ -213,6 +440,13 @@ export default function Vendors() {
           )}
         </CardContent>
       </Card>
+
+      {/* Bank accounts panel */}
+      <VendorBankAccountsDialog
+        vendor={bankVendor}
+        open={!!bankVendor}
+        onClose={() => setBankVendor(null)}
+      />
 
       {/* Edit / Create Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

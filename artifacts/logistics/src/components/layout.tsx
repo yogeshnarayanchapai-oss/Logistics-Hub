@@ -40,7 +40,7 @@ export function Layout({ children }: LayoutProps) {
     { name: "Users", href: "/users", icon: Users, roles: ["admin"] },
     { name: "Stock Inventory", href: "/stock", icon: Package, roles: ["admin", "manager", "vendor"] },
     { name: "Payments", href: "/payments", icon: Wallet, roles: ["admin", "manager", "vendor"] },
-    { name: "Bank Accounts", href: "/bank-accounts", icon: Wallet, roles: ["vendor", "admin"] },
+
     { name: "Support Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "manager", "vendor", "rider"] },
     { name: "Audit Logs", href: "/audit-logs", icon: Activity, roles: ["admin"] },
     { name: "Profile", href: "/profile", icon: UserCircle, roles: ["admin", "manager", "vendor", "rider", "staff"] },

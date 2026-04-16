@@ -279,7 +279,7 @@ export default function Vendors() {
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const data: any = {
       name: formData.get("name") as string,
       businessName: formData.get("businessName") as string || null,
       email: formData.get("email") as string,
@@ -289,6 +289,9 @@ export default function Vendors() {
       deliveryCharge: Number(formData.get("deliveryCharge")),
       status: formData.get("status") as string || "active"
     };
+    if (!editingVendor) {
+      data.password = formData.get("password") as string;
+    }
     if (editingVendor) {
       updateMutation.mutate({ id: editingVendor.id, data });
     } else {
@@ -497,6 +500,13 @@ export default function Vendors() {
                   </div>
                 )}
               </div>
+              {!editingVendor && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Login Password *</Label>
+                  <Input id="password" name="password" type="password" required placeholder="Password for vendor login account" />
+                  <p className="text-xs text-muted-foreground">A login account will be auto-created for this vendor.</p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

@@ -54,7 +54,7 @@ export default function Riders() {
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const data: any = {
       name: formData.get("name") as string,
       email: formData.get("email") as string,
       phone: formData.get("phone") as string || null,
@@ -62,6 +62,9 @@ export default function Riders() {
       stationId: formData.get("stationId") ? Number(formData.get("stationId")) : null,
       status: formData.get("status") as string || "active"
     };
+    if (!editingRider) {
+      data.password = formData.get("password") as string;
+    }
     if (editingRider) {
       updateMutation.mutate({ id: editingRider.id, data });
     } else {
@@ -263,6 +266,13 @@ export default function Riders() {
                   </div>
                 )}
               </div>
+              {!editingRider && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Login Password *</Label>
+                  <Input id="password" name="password" type="password" required placeholder="Password for rider login account" />
+                  <p className="text-xs text-muted-foreground">A login account will be auto-created for this rider.</p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

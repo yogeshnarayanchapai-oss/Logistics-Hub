@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, and } from "drizzle-orm";
-import { db, vendorsTable } from "@workspace/db";
-import { requireAuth, requireRole } from "../lib/auth";
+import { db, vendorsTable, usersTable } from "@workspace/db";
+import { requireAuth, requireRole, hashPassword } from "../lib/auth";
 import { createAuditLog } from "../lib/audit";
 
 const router: IRouter = Router();
@@ -34,18 +34,45 @@ router.get("/vendors", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/vendors", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const userId = (req as any).userId as number;
-  const { name, businessName, email, phone, address, vendorCode, deliveryCharge, linkUserId } = req.body;
+  const actorId = (req as any).userId as number;
+  const { name, businessName, email, phone, address, vendorCode, deliveryCharge, password } = req.body;
   if (!name || !email || !vendorCode || deliveryCharge === undefined) {
     res.status(400).json({ error: "name, email, vendorCode, deliveryCharge required" });
     return;
   }
+
+  // Check if a user already exists with this email
+  const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
+
+  let linkedUserId: number | null = null;
+
+  if (existingUser) {
+    // Link to existing user (update role to vendor if not already)
+    if (existingUser.role !== "vendor") {
+      await db.update(usersTable).set({ role: "vendor" }).where(eq(usersTable.id, existingUser.id));
+    }
+    linkedUserId = existingUser.id;
+  } else {
+    // Auto-create a user account
+    if (!password) { res.status(400).json({ error: "password required to create user account" }); return; }
+    const [newUser] = await db.insert(usersTable).values({
+      name,
+      email: email.toLowerCase(),
+      passwordHash: hashPassword(password),
+      phone: phone ?? null,
+      role: "vendor",
+      status: "active",
+    }).returning();
+    linkedUserId = newUser.id;
+    await createAuditLog({ userId: actorId, action: "create", entity: "user", entityId: newUser.id, description: `Auto-created user account for vendor ${name}` });
+  }
+
   const [vendor] = await db.insert(vendorsTable).values({
     name, businessName, email, phone, address, vendorCode,
     deliveryCharge: String(deliveryCharge),
-    userId: linkUserId ?? null,
+    userId: linkedUserId,
   }).returning();
-  await createAuditLog({ userId, action: "create", entity: "vendor", entityId: vendor.id, description: `Created vendor ${vendor.name}` });
+  await createAuditLog({ userId: actorId, action: "create", entity: "vendor", entityId: vendor.id, description: `Created vendor ${vendor.name}` });
   res.status(201).json(formatVendor(vendor));
 });
 
@@ -65,7 +92,7 @@ router.get("/vendors/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.patch("/vendors/:id", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
-  const userId = (req as any).userId as number;
+  const actorId = (req as any).userId as number;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const updates: Record<string, unknown> = {};
@@ -81,17 +108,35 @@ router.patch("/vendors/:id", requireAuth, requireRole("admin", "manager"), async
   if (linkUserId !== undefined) updates.userId = linkUserId;
   const [vendor] = await db.update(vendorsTable).set(updates as any).where(eq(vendorsTable.id, id)).returning();
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
-  await createAuditLog({ userId, action: "update", entity: "vendor", entityId: id, description: `Updated vendor ${vendor.name}` });
+
+  // Sync to linked user
+  if (vendor.userId) {
+    const userUpdates: Record<string, unknown> = {};
+    if (name) userUpdates.name = name;
+    if (email) userUpdates.email = email.toLowerCase();
+    if (phone !== undefined) userUpdates.phone = phone;
+    if (status) userUpdates.status = status;
+    if (Object.keys(userUpdates).length > 0) {
+      await db.update(usersTable).set(userUpdates as any).where(eq(usersTable.id, vendor.userId));
+    }
+  }
+
+  await createAuditLog({ userId: actorId, action: "update", entity: "vendor", entityId: id, description: `Updated vendor ${vendor.name}` });
   res.json(formatVendor(vendor));
 });
 
 router.delete("/vendors/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const userId = (req as any).userId as number;
+  const actorId = (req as any).userId as number;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  const [vendor] = await db.delete(vendorsTable).where(eq(vendorsTable.id, id)).returning();
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
-  await createAuditLog({ userId, action: "delete", entity: "vendor", entityId: id, description: `Deleted vendor ${vendor.name}` });
+  await db.delete(vendorsTable).where(eq(vendorsTable.id, id));
+  // Also delete linked user
+  if (vendor.userId) {
+    await db.delete(usersTable).where(eq(usersTable.id, vendor.userId));
+  }
+  await createAuditLog({ userId: actorId, action: "delete", entity: "vendor", entityId: id, description: `Deleted vendor ${vendor.name}` });
   res.sendStatus(204);
 });
 

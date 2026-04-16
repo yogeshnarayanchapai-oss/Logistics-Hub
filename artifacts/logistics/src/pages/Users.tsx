@@ -27,6 +27,7 @@ export default function Users() {
   const { user: currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [selectedRole, setSelectedRole] = useState<string>("staff");
 
   const { data: users, isLoading } = useListUsers({
     search: search || undefined,
@@ -68,15 +69,21 @@ export default function Users() {
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const role = formData.get("role") as string;
+    const data: any = {
       name: formData.get("name") as string,
       email: formData.get("email") as string,
       phone: formData.get("phone") as string || null,
-      role: formData.get("role") as any,
+      role,
       password: formData.get("password") as string,
       status: formData.get("status") as string || "active",
       stationId: formData.get("stationId") ? Number(formData.get("stationId")) : null
     };
+    if (role === "vendor") {
+      data.vendorCode = formData.get("vendorCode") as string;
+      data.deliveryCharge = Number(formData.get("deliveryCharge")) || 100;
+      data.businessName = formData.get("businessName") as string || null;
+    }
 
     if (editingUser) {
       const updateData: any = { ...data };
@@ -122,7 +129,7 @@ export default function Users() {
           <p className="text-muted-foreground">Manage roles and access control.</p>
         </div>
         {isAdmin && (
-          <Button onClick={() => { setEditingUser(null); setIsDialogOpen(true); }}>
+          <Button onClick={() => { setEditingUser(null); setSelectedRole("staff"); setIsDialogOpen(true); }}>
             <Plus className="mr-2 h-4 w-4" /> Add User
           </Button>
         )}
@@ -204,7 +211,7 @@ export default function Users() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               {isAdmin && (
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => { setEditingUser(u); setIsDialogOpen(true); }}>
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => { setEditingUser(u); setSelectedRole(u.role); setIsDialogOpen(true); }}>
                                   <Pencil className="mr-2 h-4 w-4" /> Edit
                                 </DropdownMenuItem>
                               )}
@@ -263,7 +270,8 @@ export default function Users() {
                   <Label htmlFor="role">Role *</Label>
                   <select
                     id="role" name="role"
-                    defaultValue={editingUser?.role || "staff"}
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     required
                   >
@@ -289,6 +297,30 @@ export default function Users() {
                 <Label htmlFor="password">{editingUser ? "Password (leave blank to keep current)" : "Password *"}</Label>
                 <Input id="password" name="password" type="password" required={!editingUser} />
               </div>
+              {/* Vendor-specific fields */}
+              {!editingUser && selectedRole === "vendor" && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="vendorCode">Vendor Code *</Label>
+                      <Input id="vendorCode" name="vendorCode" required placeholder="e.g. VND001" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="deliveryCharge">Delivery Charge (Rs.) *</Label>
+                      <Input id="deliveryCharge" name="deliveryCharge" type="number" defaultValue={100} required />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessName">Business Name</Label>
+                    <Input id="businessName" name="businessName" placeholder="Optional" />
+                  </div>
+                  <p className="text-xs text-muted-foreground bg-blue-50 text-blue-700 rounded p-2">A vendor profile will be auto-created and linked to this account.</p>
+                </>
+              )}
+              {/* Rider info note */}
+              {!editingUser && selectedRole === "rider" && (
+                <p className="text-xs bg-blue-50 text-blue-700 rounded p-2">A rider profile will be auto-created and linked to this account.</p>
+              )}
               {editingUser && (
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>

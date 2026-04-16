@@ -32,7 +32,6 @@ async function formatUser(user: typeof usersTable.$inferSelect) {
 router.get("/users", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const { role, status, search } = req.query as Record<string, string>;
   
-  let query = db.select().from(usersTable);
   const conditions = [];
   if (role) conditions.push(eq(usersTable.role, role));
   if (status) conditions.push(eq(usersTable.status, status));
@@ -47,8 +46,8 @@ router.get("/users", requireAuth, requireRole("admin", "manager"), async (req, r
 });
 
 router.post("/users", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const userId = (req as any).userId as number;
-  const { name, email, password, phone, role, stationId } = req.body;
+  const actorId = (req as any).userId as number;
+  const { name, email, password, phone, role, stationId, vendorCode, deliveryCharge, businessName } = req.body;
 
   if (!name || !email || !password || !role) {
     res.status(400).json({ error: "name, email, password, and role are required" });
@@ -71,7 +70,46 @@ router.post("/users", requireAuth, requireRole("admin"), async (req, res): Promi
     stationId: stationId ?? null,
   }).returning();
 
-  await createAuditLog({ userId, action: "create", entity: "user", entityId: user.id, description: `Created user ${user.name}` });
+  await createAuditLog({ userId: actorId, action: "create", entity: "user", entityId: user.id, description: `Created user ${user.name}` });
+
+  // Auto-create linked rider profile
+  if (role === "rider") {
+    const [existingRider] = await db.select().from(ridersTable).where(eq(ridersTable.email, email.toLowerCase()));
+    if (!existingRider) {
+      const [rider] = await db.insert(ridersTable).values({
+        name,
+        email: email.toLowerCase(),
+        phone: phone ?? null,
+        userId: user.id,
+      }).returning();
+      await createAuditLog({ userId: actorId, action: "create", entity: "rider", entityId: rider.id, description: `Auto-created rider profile for ${name}` });
+    } else {
+      await db.update(ridersTable).set({ userId: user.id }).where(eq(ridersTable.id, existingRider.id));
+    }
+  }
+
+  // Auto-create linked vendor profile
+  if (role === "vendor") {
+    if (!vendorCode) {
+      res.status(400).json({ error: "vendorCode is required for vendor users" });
+      return;
+    }
+    const [existingVendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.email, email.toLowerCase()));
+    if (!existingVendor) {
+      const [vendor] = await db.insert(vendorsTable).values({
+        name,
+        businessName: businessName ?? null,
+        email: email.toLowerCase(),
+        phone: phone ?? null,
+        vendorCode,
+        deliveryCharge: String(deliveryCharge ?? 100),
+        userId: user.id,
+      }).returning();
+      await createAuditLog({ userId: actorId, action: "create", entity: "vendor", entityId: vendor.id, description: `Auto-created vendor profile for ${name}` });
+    } else {
+      await db.update(vendorsTable).set({ userId: user.id }).where(eq(vendorsTable.id, existingVendor.id));
+    }
+  }
 
   const formatted = await formatUser(user);
   res.status(201).json(formatted);
@@ -86,7 +124,7 @@ router.get("/users/:id", requireAuth, requireRole("admin", "manager"), async (re
 });
 
 router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const userId = (req as any).userId as number;
+  const actorId = (req as any).userId as number;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
@@ -102,17 +140,24 @@ router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res): 
   const [user] = await db.update(usersTable).set(updates as any).where(eq(usersTable.id, id)).returning();
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-  if (status) {
-    await db.update(vendorsTable).set({ status }).where(eq(vendorsTable.userId, id));
-    await db.update(ridersTable).set({ status }).where(eq(ridersTable.userId, id));
+  // Sync name/email/phone/status to linked vendor and rider profiles
+  const profileUpdates: Record<string, unknown> = {};
+  if (name) profileUpdates.name = name;
+  if (email) profileUpdates.email = email.toLowerCase();
+  if (phone !== undefined) profileUpdates.phone = phone;
+  if (status) profileUpdates.status = status;
+
+  if (Object.keys(profileUpdates).length > 0) {
+    await db.update(vendorsTable).set(profileUpdates as any).where(eq(vendorsTable.userId, id));
+    await db.update(ridersTable).set(profileUpdates as any).where(eq(ridersTable.userId, id));
   }
 
-  await createAuditLog({ userId, action: "update", entity: "user", entityId: id, description: `Updated user ${user.name}` });
+  await createAuditLog({ userId: actorId, action: "update", entity: "user", entityId: id, description: `Updated user ${user.name}` });
   res.json(await formatUser(user));
 });
 
 router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const userId = (req as any).userId as number;
+  const actorId = (req as any).userId as number;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, id));
@@ -120,19 +165,19 @@ router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res):
   await db.delete(vendorsTable).where(eq(vendorsTable.userId, id));
   await db.delete(ridersTable).where(eq(ridersTable.userId, id));
   await db.delete(usersTable).where(eq(usersTable.id, id));
-  await createAuditLog({ userId, action: "delete", entity: "user", entityId: id, description: `Deleted user ${existing.name}` });
+  await createAuditLog({ userId: actorId, action: "delete", entity: "user", entityId: id, description: `Deleted user ${existing.name}` });
   res.sendStatus(204);
 });
 
 router.post("/users/:id/reset-password", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const userId = (req as any).userId as number;
+  const actorId = (req as any).userId as number;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const { newPassword } = req.body;
   if (!newPassword) { res.status(400).json({ error: "newPassword required" }); return; }
   const [user] = await db.update(usersTable).set({ passwordHash: hashPassword(newPassword) }).where(eq(usersTable.id, id)).returning();
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
-  await createAuditLog({ userId, action: "reset_password", entity: "user", entityId: id, description: `Reset password for ${user.name}` });
+  await createAuditLog({ userId: actorId, action: "reset_password", entity: "user", entityId: id, description: `Reset password for ${user.name}` });
   res.json({ success: true });
 });
 

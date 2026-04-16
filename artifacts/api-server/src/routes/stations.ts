@@ -17,6 +17,7 @@ async function formatStation(station: typeof stationsTable.$inferSelect) {
     code: station.code,
     address: station.address,
     areaCoverage: station.areaCoverage,
+    deliveryCharge: station.deliveryCharge ?? 0,
     status: station.status,
     riderCount: Number(rc),
     createdAt: station.createdAt.toISOString(),
@@ -31,9 +32,9 @@ router.get("/stations", requireAuth, async (req, res): Promise<void> => {
 
 router.post("/stations", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const userId = (req as any).userId as number;
-  const { name, code, address, areaCoverage } = req.body;
+  const { name, code, address, areaCoverage, deliveryCharge } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code required" }); return; }
-  const [station] = await db.insert(stationsTable).values({ name, code, address, areaCoverage }).returning();
+  const [station] = await db.insert(stationsTable).values({ name, code, address, areaCoverage, deliveryCharge: deliveryCharge ? Number(deliveryCharge) : 0 }).returning();
   await createAuditLog({ userId, action: "create", entity: "station", entityId: station.id, description: `Created station ${station.name}` });
   res.status(201).json(await formatStation(station));
 });
@@ -51,11 +52,12 @@ router.patch("/stations/:id", requireAuth, requireRole("admin"), async (req, res
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const updates: Record<string, unknown> = {};
-  const { name, code, address, areaCoverage, status } = req.body;
+  const { name, code, address, areaCoverage, deliveryCharge, status } = req.body;
   if (name) updates.name = name;
   if (code) updates.code = code;
   if (address !== undefined) updates.address = address;
   if (areaCoverage !== undefined) updates.areaCoverage = areaCoverage;
+  if (deliveryCharge !== undefined) updates.deliveryCharge = Number(deliveryCharge);
   if (status) updates.status = status;
   const [station] = await db.update(stationsTable).set(updates as any).where(eq(stationsTable.id, id)).returning();
   if (!station) { res.status(404).json({ error: "Station not found" }); return; }

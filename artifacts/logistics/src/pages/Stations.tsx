@@ -68,6 +68,7 @@ export default function Stations() {
       code: formData.get("code") as string,
       address: formData.get("address") as string || null,
       areaCoverage: formData.get("areaCoverage") as string || null,
+      deliveryCharge: Number(formData.get("deliveryCharge")) || 0,
       status: formData.get("status") as string || "active"
     };
     if (editingStation) {
@@ -134,6 +135,7 @@ export default function Stations() {
                     <TableHead>Code</TableHead>
                     <TableHead>Station Name</TableHead>
                     <TableHead>Area Coverage</TableHead>
+                    <TableHead className="text-right">Delivery Charge</TableHead>
                     <TableHead>Assigned Riders</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -142,7 +144,7 @@ export default function Stations() {
                 <TableBody>
                   {!stations.length ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No stations found.</TableCell>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No stations found.</TableCell>
                     </TableRow>
                   ) : (
                     stations.map((station) => (
@@ -155,8 +157,11 @@ export default function Stations() {
                           </div>
                           {station.address && <div className="text-xs text-muted-foreground">{station.address}</div>}
                         </TableCell>
-                        <TableCell>{station.areaCoverage || "—"}</TableCell>
-                        <TableCell>{station.riderCount}</TableCell>
+                        <TableCell>{(station as any).areaCoverage || "—"}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          Rs. {((station as any).deliveryCharge ?? 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell>{(station as any).riderCount}</TableCell>
                         <TableCell>
                           <Badge variant={station.status === "active" ? "default" : "secondary"}>{station.status}</Badge>
                         </TableCell>
@@ -241,6 +246,14 @@ export default function Stations() {
               <div className="space-y-2">
                 <Label htmlFor="areaCoverage">Area Coverage (comma separated)</Label>
                 <Input id="areaCoverage" name="areaCoverage" defaultValue={editingStation?.areaCoverage} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deliveryCharge">Delivery Charge (Rs.) *</Label>
+                <Input
+                  id="deliveryCharge" name="deliveryCharge" type="number" min="0"
+                  defaultValue={(editingStation as any)?.deliveryCharge ?? 0}
+                  required
+                />
               </div>
               {editingStation && (
                 <div className="space-y-2">

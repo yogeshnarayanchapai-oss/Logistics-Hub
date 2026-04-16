@@ -75,8 +75,8 @@ export default function OrdersList() {
   const [commentText, setCommentText] = useState("");
   const commentMutation = useAddOrderComment({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListOrderCommentsQueryKey(commentTarget?.id ?? 0) });
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: getListOrderCommentsQueryKey(variables.id) });
         toast({ title: "Comment added" });
         setCommentTarget(null);
         setCommentText("");
@@ -594,7 +594,7 @@ export default function OrdersList() {
               disabled={!commentText.trim() || commentMutation.isPending}
               onClick={() => {
                 if (!commentTarget || !commentText.trim()) return;
-                commentMutation.mutate({ id: commentTarget.id, data: { message: commentText.trim() } });
+                commentMutation.mutate({ id: commentTarget.id, data: { content: commentText.trim() } });
               }}
             >
               {commentMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}

@@ -71,4 +71,12 @@ router.patch("/stock/:id", requireAuth, requireRole("admin", "manager"), async (
   res.json(await formatStock(s));
 });
 
+router.delete("/stock/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  const [s] = await db.delete(stockTable).where(eq(stockTable.id, id)).returning();
+  if (!s) { res.status(404).json({ error: "Stock entry not found" }); return; }
+  res.json({ success: true });
+});
+
 export default router;

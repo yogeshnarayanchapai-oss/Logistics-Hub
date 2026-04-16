@@ -1,4 +1,4 @@
-import { useListOrders, useDeleteOrder, useAssignOrder, useListRiders, useAddOrderComment, getListOrdersQueryKey, getListOrderCommentsQueryKey } from "@workspace/api-client-react";
+import { useListOrders, useDeleteOrder, useAssignOrder, useListRiders, useAddOrderComment, useUpdateOrderStatus, getListOrdersQueryKey, getListOrderCommentsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useState, useRef, useMemo } from "react";
@@ -47,6 +47,21 @@ function getDateRange(preset: DatePreset, customFrom: string, customTo: string) 
   return { dateFrom: undefined, dateTo: undefined };
 }
 
+const RIDER_NEXT_STATUSES: Record<string, { value: string; label: string }[]> = {
+  assigned: [
+    { value: "picked_for_delivery", label: "Picked Up" },
+  ],
+  picked_for_delivery: [
+    { value: "out_for_delivery", label: "Out for Delivery" },
+  ],
+  out_for_delivery: [
+    { value: "delivered", label: "Delivered" },
+    { value: "failed_delivery", label: "Failed Delivery" },
+    { value: "reschedule", label: "Reschedule" },
+    { value: "return_pending", label: "Return Pending" },
+  ],
+};
+
 export default function OrdersList() {
   const { user } = useAuth();
   const prefix = useRolePrefix();
@@ -82,6 +97,17 @@ export default function OrdersList() {
         setCommentText("");
       },
       onError: () => toast({ title: "Failed to add comment", variant: "destructive" }),
+    },
+  });
+
+  // Rider quick status change
+  const statusChangeMutation = useUpdateOrderStatus({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+        toast({ title: "Status updated" });
+      },
+      onError: () => toast({ title: "Failed to update status", variant: "destructive" }),
     },
   });
 
@@ -381,7 +407,38 @@ export default function OrdersList() {
                         </TableCell>
                         <TableCell className="font-medium">Rs. {order.codAmount.toLocaleString()}</TableCell>
                         <TableCell>
-                          {canEdit && order.status === "assigned" ? (
+                          {isRider ? (
+                            (() => {
+                              const nextStatuses = RIDER_NEXT_STATUSES[order.status] ?? [];
+                              if (!nextStatuses.length) return <StatusBadge status={order.status} />;
+                              return (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className="focus:outline-none" title="Click to update status">
+                                      <StatusBadge
+                                        status={order.status}
+                                        className="cursor-pointer ring-1 ring-offset-1 ring-primary/30 hover:ring-primary/60 transition-shadow"
+                                      />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start" className="w-52">
+                                    <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Update status to:</div>
+                                    <DropdownMenuSeparator />
+                                    {nextStatuses.map(({ value, label }) => (
+                                      <DropdownMenuItem
+                                        key={value}
+                                        className="cursor-pointer"
+                                        disabled={statusChangeMutation.isPending}
+                                        onClick={() => statusChangeMutation.mutate({ id: order.id, data: { status: value } })}
+                                      >
+                                        {label}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              );
+                            })()
+                          ) : canEdit && order.status === "assigned" ? (
                             <span
                               title="Double-click to reassign rider"
                               onDoubleClick={() => {

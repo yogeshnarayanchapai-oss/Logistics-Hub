@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Truck, Loader2, ShieldCheck, Users, Store, Bike } from "lucide-react";
+import { Truck, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
@@ -17,13 +17,6 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-
-const DEMO_ACCOUNTS = [
-  { role: "Admin", email: "admin@swiftship.com", password: "Admin@123", icon: ShieldCheck, color: "bg-red-50 border-red-200 text-red-700 hover:bg-red-100" },
-  { role: "Manager", email: "manager@swiftship.com", password: "Manager@123", icon: Users, color: "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100" },
-  { role: "Vendor", email: "vendor1@swiftship.com", password: "Vendor@123", icon: Store, color: "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100" },
-  { role: "Rider", email: "rider1@swiftship.com", password: "Rider@123", icon: Bike, color: "bg-green-50 border-green-200 text-green-700 hover:bg-green-100" },
-];
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -56,37 +49,34 @@ export default function Login() {
     loginMutation.mutate({ data });
   };
 
-  const fillCredentials = (email: string, password: string) => {
-    form.setValue("email", email, { shouldValidate: true });
-    form.setValue("password", password, { shouldValidate: true });
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-6">
-        {/* Logo */}
+      <div className="max-w-md w-full space-y-8">
         <div className="flex flex-col items-center justify-center">
           <div className="bg-primary p-3 rounded-full mb-4">
             <Truck className="h-10 w-10 text-white" />
           </div>
           <h2 className="text-3xl font-extrabold text-gray-900">SwiftShip</h2>
-          <p className="mt-1 text-sm text-gray-500">Logistics Management System</p>
+          <p className="mt-2 text-sm text-gray-600">Logistics Management System</p>
         </div>
 
-        {/* Login form */}
         <Card>
           <CardHeader>
             <CardTitle>Sign in to your account</CardTitle>
-            <CardDescription>Enter your email and password to continue.</CardDescription>
+            <CardDescription>Enter your email and password to access the command center.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="email">Email address</Label>
                 <Input
                   id="email"
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   autoComplete="email"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   {...form.register("email")}
                   className={form.formState.errors.email ? "border-red-500" : ""}
                 />
@@ -119,30 +109,9 @@ export default function Login() {
             </form>
           </CardContent>
           <CardFooter className="justify-center">
-            <p className="text-xs text-gray-400">Secure access for authorized personnel only.</p>
+            <p className="text-xs text-gray-500">Secure access for authorized personnel only.</p>
           </CardFooter>
         </Card>
-
-        {/* Demo credential quick-fill */}
-        <div className="space-y-2">
-          <p className="text-xs text-center text-gray-400 font-medium uppercase tracking-wide">Demo Accounts — click to auto-fill</p>
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO_ACCOUNTS.map(({ role, email, password, icon: Icon, color }) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => fillCredentials(email, password)}
-                className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${color}`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold">{role}</div>
-                  <div className="text-[10px] truncate opacity-70">{email}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

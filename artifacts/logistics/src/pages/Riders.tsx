@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Search, Truck, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
@@ -169,10 +170,7 @@ export default function Riders() {
                         <TableCell>{rider.stationName || "—"}</TableCell>
                         <TableCell>{rider.vehicleNumber || "—"}</TableCell>
                         <TableCell>
-                          <div className="flex gap-2 flex-wrap">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700">{rider.assignedCount} Assigned</Badge>
-                            <Badge variant="outline" className="bg-green-50 text-green-700">{rider.deliveredToday} Today</Badge>
-                          </div>
+                          <Badge variant="outline" className="bg-green-50 text-green-700">{rider.deliveredToday} Today</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={rider.status === "active" ? "default" : "secondary"}>{rider.status}</Badge>
@@ -180,30 +178,43 @@ export default function Riders() {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {canManage && (
-                              <Button variant="ghost" size="sm" onClick={() => { setEditingRider(rider); setIsDialogOpen(true); }}>
-                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => { setEditingRider(rider); setIsDialogOpen(true); }}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit</TooltipContent>
+                              </Tooltip>
                             )}
                             {canManage && (
-                              <Button
-                                variant="ghost" size="sm"
-                                className={rider.status === "active" ? "text-orange-600 hover:text-orange-700" : "text-green-600 hover:text-green-700"}
-                                onClick={() => toggleStatus(rider)}
-                                disabled={updateMutation.isPending}
-                              >
-                                {rider.status === "active"
-                                  ? <><ToggleRight className="h-3.5 w-3.5 mr-1" /> Deactivate</>
-                                  : <><ToggleLeft className="h-3.5 w-3.5 mr-1" /> Activate</>}
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost" size="icon"
+                                    className={`h-8 w-8 ${rider.status === "active" ? "text-orange-500 hover:text-orange-700" : "text-green-600 hover:text-green-700"}`}
+                                    onClick={() => toggleStatus(rider)}
+                                    disabled={updateMutation.isPending}
+                                  >
+                                    {rider.status === "active" ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>{rider.status === "active" ? "Deactivate" : "Activate"}</TooltipContent>
+                              </Tooltip>
                             )}
                             {isAdmin && (
-                              <Button
-                                variant="ghost" size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDeleteTarget({ id: rider.id, name: rider.name })}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost" size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() => setDeleteTarget({ id: rider.id, name: rider.name })}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete</TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         </TableCell>

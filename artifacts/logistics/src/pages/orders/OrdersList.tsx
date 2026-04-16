@@ -49,15 +49,18 @@ function getDateRange(preset: DatePreset, customFrom: string, customTo: string) 
 
 const RIDER_NEXT_STATUSES: Record<string, { value: string; label: string }[]> = {
   assigned: [
-    { value: "picked_for_delivery", label: "Picked Up" },
+    { value: "delivered", label: "Delivered" },
+    { value: "reschedule", label: "Follow Up" },
   ],
   picked_for_delivery: [
     { value: "out_for_delivery", label: "Out for Delivery" },
+    { value: "delivered", label: "Delivered" },
+    { value: "reschedule", label: "Follow Up" },
   ],
   out_for_delivery: [
     { value: "delivered", label: "Delivered" },
     { value: "failed_delivery", label: "Failed Delivery" },
-    { value: "reschedule", label: "Reschedule" },
+    { value: "reschedule", label: "Follow Up" },
     { value: "return_pending", label: "Return Pending" },
   ],
 };

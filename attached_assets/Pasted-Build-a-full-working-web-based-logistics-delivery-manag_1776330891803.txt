@@ -1,0 +1,836 @@
+Build a full working web-based logistics delivery management system for my company.
+The system is for local delivery operations and must be designed with a clean, modern red + white theme.
+
+Company workflow context
+
+Right now, my logistics company operates only in:
+
+Kathmandu
+Lalitpur
+Bhaktapur
+
+Later, more service stations / branches will be added.
+
+Current team structure:
+
+1 Admin
+1 Manager
+5 Riders
+2 Vendors
+
+The system must be built in a scalable way so I can add unlimited:
+
+Vendors
+Riders
+Staff
+Service Stations / Branches
+Core business workflow to automate
+
+Currently, vendors send delivery orders through WhatsApp in a format like this:
+
+Example order format:
+
+Ansan Baniya, 9744638103, Vitigo Bee Venom Treatment Cream 1 pcs, Sinamangal, Rs1000, vedaz01, 2 BAJE DELIVERY GARDINU HOLA
+
+Required workflow
+Vendor submits order manually or by bulk entry.
+Manager checks whether the order is duplicate:
+same customer
+same phone
+same address
+same product
+same day / recent previous day
+If duplicate is found, system should clearly flag it.
+If not duplicate, manager/admin assigns order to the nearest or selected rider based on service station / area.
+Rider already carries vendor stock and attempts delivery.
+Rider updates status and can add comments if there is an issue.
+Vendor can see order status in real time and reply to comments if needed.
+At the end of the day:
+COD collection is calculated
+delivery charge is deducted
+payable amount to vendor is shown
+admin/manager can release vendor payment
+Vendor stock report must update automatically:
+opening stock
+delivered stock
+remaining stock
+Vendor can request COD release to their bank account.
+Full reports, filters, analytics, and ticketing/help support must be included.
+Technical requirements
+
+Build this as a production-ready full-stack web app with:
+
+modern responsive UI
+role-based login
+proper database design
+clean modular architecture
+secure backend APIs
+proper validation
+scalable codebase
+Preferred stack
+
+Use a modern stack such as:
+
+Frontend: React / Next.js
+Backend: Node.js / Express or Next.js API routes
+Database: PostgreSQL
+ORM: Prisma
+Auth: secure JWT or session-based auth
+UI: modern component library if needed
+Charts: analytics dashboard charts
+Tables: advanced searchable/filterable tables
+Deployment-ready structure
+
+If possible, include:
+
+seed data
+demo accounts
+reusable components
+role-based route protection
+audit logs
+clean admin panel layout
+Design requirements
+Theme
+Primary color: Red
+Secondary/base: White
+Accent: light gray / soft neutral for cards and borders
+Clean professional logistics-focused interface
+Desktop-first but fully responsive
+Use cards, tables, tabs, modals, filters, badges, and status chips
+Sidebar navigation for dashboard
+Branding style
+
+The system should look like a modern logistics SaaS dashboard, not a basic form app.
+
+User roles
+
+Create these roles with full role-based access control:
+
+Admin
+Manager
+Vendor
+Rider
+Staff (custom internal staff role)
+
+Admin must be able to create and manage users with roles.
+
+Role permissions
+1) Admin permissions
+
+Admin should have full access to everything:
+
+Dashboard overview
+All vendor orders page
+All users page
+Create/edit/delete vendors
+Create/edit/delete riders
+Create/edit/delete staff
+Create/edit/delete managers
+Create/edit/delete service stations
+Assign riders to stations
+Assign orders
+Reassign orders
+View duplicate order alerts
+Payment release page
+Vendor stock management
+Reports and analytics
+Ticket/help management
+System settings
+Audit logs
+Role and permission management
+2) Manager permissions
+
+Manager should be able to:
+
+View dashboard
+View all orders
+Review duplicate flags
+Approve or reject suspicious duplicate orders
+Assign/reassign rider
+Update order workflow
+View vendor comments and rider comments
+Manage daily operations
+View stock movement
+View payment summaries
+Respond to tickets
+See service station-wise reports
+
+Manager should not have super admin access like deleting core system settings unless explicitly allowed.
+
+3) Vendor permissions
+
+Vendor dashboard must include:
+
+Dashboard overview
+Order creation
+Bulk order entry
+Order list with filters
+Status tracking
+Comment/reply section per order
+Delivery reports
+COD summary
+Payment release request page
+Bank account details page
+Remaining stock report
+Ticket/help page
+Notification area
+
+Vendor should only see their own data, never other vendors’ data.
+
+4) Rider permissions
+
+Rider dashboard must include:
+
+Dashboard summary
+Assigned orders only
+Change order status
+Add delivery comments
+Call/customer details view
+Daily completed deliveries report
+COD collection summary
+Delivery history
+Issue reporting
+Help/ticket page
+
+Rider should only see orders assigned to them.
+
+5) Staff permissions
+
+Staff role should be configurable and limited by admin.
+Admin can choose what staff can access.
+
+Main modules
+A. Authentication & access control
+
+Build secure login system with:
+
+email / username + password login
+role-based dashboard redirect
+forgot password
+reset password
+active/inactive user control
+session handling
+secure protected routes
+RLS-style permission enforcement in backend logic
+every API must verify role and ownership
+B. Dashboard module
+Admin dashboard
+
+Show:
+
+total orders
+pending orders
+assigned orders
+delivered orders
+failed orders
+returned orders
+duplicate flagged orders
+COD collected today
+total vendor payable
+total released payments
+active vendors
+active riders
+service station summary
+top performing riders
+top vendors by volume
+daily / weekly / monthly charts
+Vendor dashboard
+
+Show:
+
+today’s submitted orders
+pending orders
+delivered orders
+failed / returned orders
+COD collected
+payable balance
+released payments
+stock in hand with logistics
+recent comments / updates
+recent tickets
+Rider dashboard
+
+Show:
+
+assigned today
+delivered today
+pending today
+failed today
+COD collected today
+performance trend
+recent assigned orders
+C. Orders module
+
+This is the most important module.
+
+Each order should have fields like:
+
+order ID (auto-generated)
+vendor ID
+vendor name
+customer name
+customer phone
+alternate phone
+product name
+SKU / product code if needed
+quantity
+COD amount
+delivery charge
+vendor payable amount
+address
+landmark
+area
+city
+district
+service station
+destination branch
+assigned rider
+priority
+requested delivery time
+order source
+notes
+internal note
+rider comment
+vendor comment
+status
+duplicate flag
+duplicate reason
+created by
+created at
+updated at
+delivered at
+payment release status
+Order statuses
+
+Include proper statuses such as:
+
+New
+Duplicate Flagged
+Under Review
+Confirmed
+Assigned
+Picked for Delivery
+Out for Delivery
+Delivered
+Partial Delivered
+Failed Delivery
+Reschedule
+Return Pending
+Returned
+Cancelled
+Payment Pending
+Payment Released
+
+Use colored badges for statuses.
+
+D. Duplicate detection logic
+
+This is a key requirement.
+
+When a new order is created, automatically check existing recent orders.
+
+Flag as possible duplicate if combinations match like:
+
+same phone number
+same customer name + same phone
+same phone + same address
+same phone + same product
+same vendor + same phone + same product within recent time
+same or previous day duplicate patterns
+
+Duplicate result should show:
+
+duplicate confidence
+matched existing order ID
+matched vendor
+matched date
+matched fields
+clear warning card
+
+Manager/admin can:
+
+mark as valid
+merge if needed
+reject
+continue anyway
+E. Bulk order entry form
+
+Vendor must be able to submit bulk orders in spreadsheet-like format.
+
+Bulk entry features
+multiple row entry
+paste from Excel / Google Sheets
+import CSV
+manual row add/remove
+inline validation
+save draft
+submit validated rows only
+Required validation
+
+For bulk entry, if any cell is invalid, show red alert only on those cells.
+
+Examples:
+
+phone number invalid
+destination branch invalid
+required field missing
+COD invalid
+quantity invalid
+Validation behavior
+invalid phone cell should turn red
+invalid destination branch cell should turn red
+tooltip or inline error message should appear
+valid cells should remain normal
+row summary should show which rows failed
+user can fix and resubmit
+Phone validation
+allow Nepal mobile number rules
+optional support for country code normalization
+remove spaces and invalid characters automatically if possible
+Destination branch validation
+
+Only allow valid branch / station names existing in the system.
+
+F. Service stations / branches module
+
+Admin can manage service stations.
+
+Initially create these stations:
+
+Kathmandu
+Lalitpur
+Bhaktapur
+
+Each station should support:
+
+name
+code
+address
+area coverage
+status active/inactive
+assigned riders
+assigned manager/staff if needed
+
+Later system must support more branches easily.
+
+G. Rider assignment module
+
+Manager/admin can assign orders to riders manually.
+
+Optional smart logic:
+
+suggest rider based on service station / area
+show rider workload
+show active assigned count
+show delivery performance
+show available stock if needed
+
+Features:
+
+single assign
+bulk assign
+reassign
+assignment history log
+H. Comments & communication module
+
+Every order should have an internal communication thread.
+
+Required communication flow
+Rider can leave comment
+Vendor can reply
+Manager/admin can comment
+comment history must be preserved
+each comment shows user, role, date, time
+attachments optional
+comment visibility rules if needed:
+internal only
+vendor visible
+rider visible
+I. Inventory / stock module
+
+Since vendor has already provided stock to the logistics team, the system must track stock.
+
+Per vendor and product:
+
+opening stock
+stock received
+delivered stock
+returned stock
+damaged stock
+current stock in hand
+rider-wise distributed stock if needed
+
+Vendor should be able to see stock report for their own items.
+
+Admin/manager should be able to:
+
+add stock intake
+adjust stock
+transfer stock
+see stock ledger
+export reports
+J. COD and payment release module
+COD flow
+
+For delivered orders:
+
+COD amount is collected
+delivery charge is deducted
+net payable to vendor is calculated
+
+Formula example:
+Vendor Payable = COD Collected - Delivery Charge - any other agreed deductions
+
+Payment release system
+
+Vendor should have:
+
+bank account page
+add/edit bank details
+payment release request page
+
+Bank fields:
+
+account holder name
+bank name
+branch
+account number
+wallet / optional payout method
+remarks
+Payment request flow
+
+Vendor can:
+
+see available payable balance
+request payment release
+choose bank account
+submit request
+
+Admin/manager can:
+
+review request
+approve
+reject
+mark as released
+add release note
+release reference ID
+payment date
+Payment reports
+
+Need:
+
+pending release
+approved release
+released payments
+rejected requests
+vendor-wise payable
+date-wise settlement reports
+K. Reports module
+
+Build a powerful report section with filters and exports.
+
+Admin/Manager reports
+order report
+vendor report
+rider report
+station report
+COD report
+payment release report
+stock report
+duplicate order report
+failed delivery report
+performance report
+Vendor reports
+own order report
+delivery report
+stock report
+COD summary
+payment summary
+Rider reports
+own delivery history
+delivery count
+COD collected
+failed delivery reasons
+Filters everywhere
+
+Include strong filters like:
+
+date range
+status
+vendor
+rider
+service station
+city
+payment status
+duplicate only
+COD range
+search by phone
+search by order ID
+search by customer name
+Export
+
+Allow export to:
+
+CSV
+Excel
+PDF if possible
+L. Ticket / Help support module
+
+System must include support ticketing.
+
+Vendor can:
+open ticket
+choose category
+add priority
+write message
+attach file
+reply to ticket
+track status
+Rider can:
+open issue ticket
+report delivery issue
+report stock issue
+report payment issue
+Admin/Manager can:
+view all tickets
+reply
+change status
+assign ticket
+close ticket
+
+Ticket statuses:
+
+Open
+In Progress
+Waiting Reply
+Resolved
+Closed
+M. User management module
+
+Admin user page should include:
+
+create user
+edit user
+deactivate user
+assign role
+assign vendor ownership
+assign rider station
+assign permissions
+reset password
+see status active/inactive
+
+Need proper user table with:
+
+name
+email
+phone
+role
+station
+status
+created date
+N. Notifications
+
+Include in-app notifications for:
+
+new order created
+duplicate flagged
+rider assigned
+order delivered
+rider comment added
+vendor reply added
+payment request submitted
+payment released
+ticket reply
+
+Optional:
+
+email or WhatsApp integration-ready architecture for future
+O. Search and filters
+
+Every major table should support:
+
+search input
+status filter
+date range filter
+advanced filters
+sortable columns
+pagination
+
+Need fast tables and smooth UX.
+
+P. Security requirements
+
+Implement security carefully:
+
+role-based access control
+backend ownership checks
+protected API routes
+hashed passwords
+input validation
+safe error handling
+audit logs for key actions
+no vendor can access other vendor data
+no rider can access other rider data
+no public access to private dashboards
+Q. Audit logs
+
+Track important activities like:
+
+user created
+role changed
+order created
+duplicate overridden
+order assigned
+status changed
+payment approved
+payment released
+stock adjusted
+ticket replied
+
+Admin should be able to view audit logs.
+
+R. Sample pages required
+Admin side
+Login
+Admin Dashboard
+Orders
+Order Details
+Duplicate Review
+Vendors
+Riders
+Staff
+Users & Roles
+Service Stations
+Inventory / Stock
+COD & Payment Release
+Reports
+Tickets
+Settings
+Audit Logs
+Vendor side
+Login
+Vendor Dashboard
+Create Order
+Bulk Entry
+Orders List
+Order Details / Comments
+Stock Report
+COD Summary
+Payment Requests
+Bank Accounts
+Reports
+Tickets / Help
+Profile / Settings
+Rider side
+Login
+Rider Dashboard
+Assigned Orders
+Order Detail
+Update Status
+Comments
+Delivery Report
+COD Summary
+Tickets
+Profile
+Database design
+
+Create proper relational database schema with tables like:
+
+users
+roles
+permissions
+vendors
+riders
+staff_profiles
+service_stations
+orders
+order_items if needed
+order_comments
+duplicate_checks
+stock_entries
+stock_balances
+payment_requests
+payment_releases
+bank_accounts
+tickets
+ticket_messages
+notifications
+audit_logs
+
+Use proper foreign keys and indexes.
+
+Demo / seed data
+
+Create seed data with:
+
+1 admin
+1 manager
+2 vendors
+5 riders
+Kathmandu, Lalitpur, Bhaktapur service stations
+sample products
+sample orders
+sample comments
+sample payment release requests
+
+Also provide demo login credentials.
+
+Extra UX requirements
+use status badges
+use summary cards
+use charts in dashboards
+use modal dialogs for actions
+use confirmation before destructive actions
+responsive tables
+modern professional layout
+red + white branding throughout
+proper empty states
+loading skeletons if possible
+Final development output required
+
+I want the app generated with:
+
+full source code
+database schema
+seed script
+demo data
+responsive dashboards
+working role-based login
+proper CRUD
+duplicate detection logic
+bulk order validation with red invalid cells
+stock, COD, payment release, ticketing, and reporting modules
+clean scalable codebase
+instructions to run locally in Replit
+Important final instruction
+
+Do not build a dummy UI only.
+Build a functional logistics management system with proper backend, database, validations, role-based permissions, realistic tables, filters, and workflows.
+
+Start by:
+
+planning database schema
+creating authentication and roles
+building dashboards
+building orders workflow
+implementing duplicate detection
+building stock and payment release modules
+finishing reports and tickets
+
+Also generate:
+
+sample seed data
+sample order lifecycle
+demo credentials
+Optional advanced features if possible
+
+If possible, also include:
+
+WhatsApp import-ready parser for vendor order text format
+CSV bulk upload
+rider area mapping
+vendor payout ledger
+delivery attempt history
+printable invoice/summary
+branch performance comparison
+API-ready architecture for mobile app later

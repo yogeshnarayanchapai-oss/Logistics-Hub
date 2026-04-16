@@ -1,22 +1,49 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SwiftShip Logistics Management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: stations
+    description: Service stations / branches
+  - name: vendors
+    description: Vendor management
+  - name: riders
+    description: Rider management
+  - name: orders
+    description: Order management
+  - name: comments
+    description: Order comments
+  - name: stock
+    description: Stock / inventory management
+  - name: payments
+    description: COD and payment release
+  - name: tickets
+    description: Support tickets
+  - name: notifications
+    description: Notifications
+  - name: audit
+    description: Audit logs
+  - name: dashboard
+    description: Dashboard summaries
+  - name: reports
+    description: Reports and analytics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +51,1286 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordBody"
+      responses:
+        "200":
+          description: Password changed
+
+  # Users
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /users/{id}/reset-password:
+    post:
+      operationId: resetUserPassword
+      tags: [users]
+      summary: Reset a user password (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordBody"
+      responses:
+        "200":
+          description: Password reset
+
+  # Service Stations
+  /stations:
+    get:
+      operationId: listStations
+      tags: [stations]
+      summary: List all service stations
+      responses:
+        "200":
+          description: List of stations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Station"
+    post:
+      operationId: createStation
+      tags: [stations]
+      summary: Create a service station
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStationBody"
+      responses:
+        "201":
+          description: Station created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Station"
+
+  /stations/{id}:
+    get:
+      operationId: getStation
+      tags: [stations]
+      summary: Get a station
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Station
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Station"
+    patch:
+      operationId: updateStation
+      tags: [stations]
+      summary: Update a station
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStationBody"
+      responses:
+        "200":
+          description: Updated station
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Station"
+    delete:
+      operationId: deleteStation
+      tags: [stations]
+      summary: Delete a station
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Vendors
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      summary: List all vendors
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vendor"
+    post:
+      operationId: createVendor
+      tags: [vendors]
+      summary: Create a vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorBody"
+      responses:
+        "201":
+          description: Vendor created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /vendors/{id}:
+    get:
+      operationId: getVendor
+      tags: [vendors]
+      summary: Get a vendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+    patch:
+      operationId: updateVendor
+      tags: [vendors]
+      summary: Update a vendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVendorBody"
+      responses:
+        "200":
+          description: Updated vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+    delete:
+      operationId: deleteVendor
+      tags: [vendors]
+      summary: Delete a vendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Riders
+  /riders:
+    get:
+      operationId: listRiders
+      tags: [riders]
+      summary: List all riders
+      parameters:
+        - name: stationId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of riders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rider"
+    post:
+      operationId: createRider
+      tags: [riders]
+      summary: Create a rider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRiderBody"
+      responses:
+        "201":
+          description: Rider created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rider"
+
+  /riders/{id}:
+    get:
+      operationId: getRider
+      tags: [riders]
+      summary: Get a rider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rider"
+    patch:
+      operationId: updateRider
+      tags: [riders]
+      summary: Update a rider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRiderBody"
+      responses:
+        "200":
+          description: Updated rider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rider"
+    delete:
+      operationId: deleteRider
+      tags: [riders]
+      summary: Delete a rider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Orders
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List orders with filters
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: vendorId
+          in: query
+          schema:
+            type: integer
+        - name: riderId
+          in: query
+          schema:
+            type: integer
+        - name: stationId
+          in: query
+          schema:
+            type: integer
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: duplicateOnly
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated list of orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderListResponse"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create a new order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderBody"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/bulk:
+    post:
+      operationId: createBulkOrders
+      tags: [orders]
+      summary: Create orders in bulk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkOrderBody"
+      responses:
+        "201":
+          description: Bulk order result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkOrderResult"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get an order by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order with comments and history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+    patch:
+      operationId: updateOrder
+      tags: [orders]
+      summary: Update an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderBody"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+    delete:
+      operationId: deleteOrder
+      tags: [orders]
+      summary: Delete an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /orders/{id}/assign:
+    post:
+      operationId: assignOrder
+      tags: [orders]
+      summary: Assign or reassign a rider to an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignOrderBody"
+      responses:
+        "200":
+          description: Order assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}/status:
+    post:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Update order status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStatusBody"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}/duplicate-action:
+    post:
+      operationId: handleDuplicateOrder
+      tags: [orders]
+      summary: Handle duplicate order (approve/reject/merge)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateActionBody"
+      responses:
+        "200":
+          description: Action taken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  # Comments
+  /orders/{orderId}/comments:
+    get:
+      operationId: listOrderComments
+      tags: [comments]
+      summary: List comments for an order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+    post:
+      operationId: addOrderComment
+      tags: [comments]
+      summary: Add a comment to an order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentBody"
+      responses:
+        "201":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  # Stock
+  /stock:
+    get:
+      operationId: listStock
+      tags: [stock]
+      summary: List stock entries
+      parameters:
+        - name: vendorId
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of stock entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockEntry"
+    post:
+      operationId: createStockEntry
+      tags: [stock]
+      summary: Add stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStockBody"
+      responses:
+        "201":
+          description: Stock added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockEntry"
+
+  /stock/{id}:
+    patch:
+      operationId: updateStockEntry
+      tags: [stock]
+      summary: Adjust stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStockBody"
+      responses:
+        "200":
+          description: Stock updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockEntry"
+
+  # Bank Accounts
+  /bank-accounts:
+    get:
+      operationId: listBankAccounts
+      tags: [payments]
+      summary: List bank accounts
+      parameters:
+        - name: vendorId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of bank accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BankAccount"
+    post:
+      operationId: createBankAccount
+      tags: [payments]
+      summary: Add a bank account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBankAccountBody"
+      responses:
+        "201":
+          description: Bank account added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccount"
+
+  /bank-accounts/{id}:
+    patch:
+      operationId: updateBankAccount
+      tags: [payments]
+      summary: Update a bank account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBankAccountBody"
+      responses:
+        "200":
+          description: Updated bank account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccount"
+    delete:
+      operationId: deleteBankAccount
+      tags: [payments]
+      summary: Delete a bank account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Payment Requests
+  /payment-requests:
+    get:
+      operationId: listPaymentRequests
+      tags: [payments]
+      summary: List payment release requests
+      parameters:
+        - name: vendorId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of payment requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentRequest"
+    post:
+      operationId: createPaymentRequest
+      tags: [payments]
+      summary: Submit a payment release request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentRequestBody"
+      responses:
+        "201":
+          description: Payment request submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRequest"
+
+  /payment-requests/{id}:
+    get:
+      operationId: getPaymentRequest
+      tags: [payments]
+      summary: Get a payment request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payment request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRequest"
+    patch:
+      operationId: updatePaymentRequest
+      tags: [payments]
+      summary: Approve/reject/release a payment request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePaymentRequestBody"
+      responses:
+        "200":
+          description: Payment request updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRequest"
+
+  # Tickets
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List support tickets
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ticket"
+    post:
+      operationId: createTicket
+      tags: [tickets]
+      summary: Create a support ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketBody"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+
+  /tickets/{id}:
+    get:
+      operationId: getTicket
+      tags: [tickets]
+      summary: Get a ticket with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDetail"
+    patch:
+      operationId: updateTicket
+      tags: [tickets]
+      summary: Update a ticket status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTicketBody"
+      responses:
+        "200":
+          description: Updated ticket
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+
+  /tickets/{id}/messages:
+    post:
+      operationId: addTicketMessage
+      tags: [tickets]
+      summary: Reply to a ticket
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketMessageBody"
+      responses:
+        "201":
+          description: Message added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMessage"
+
+  # Notifications
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for current user
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: All marked read
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked read
+
+  # Audit Logs
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit logs
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+
+  # Dashboard
+  /dashboard/admin-summary:
+    get:
+      operationId: getAdminDashboardSummary
+      tags: [dashboard]
+      summary: Get admin dashboard summary
+      responses:
+        "200":
+          description: Admin dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboardSummary"
+
+  /dashboard/vendor-summary:
+    get:
+      operationId: getVendorDashboardSummary
+      tags: [dashboard]
+      summary: Get vendor dashboard summary
+      responses:
+        "200":
+          description: Vendor dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorDashboardSummary"
+
+  /dashboard/rider-summary:
+    get:
+      operationId: getRiderDashboardSummary
+      tags: [dashboard]
+      summary: Get rider dashboard summary
+      responses:
+        "200":
+          description: Rider dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiderDashboardSummary"
+
+  /dashboard/order-trends:
+    get:
+      operationId: getOrderTrends
+      tags: [dashboard]
+      summary: Get order trends chart data
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order trends
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderTrendPoint"
+
+  /dashboard/station-performance:
+    get:
+      operationId: getStationPerformance
+      tags: [dashboard]
+      summary: Get station-wise performance data
+      responses:
+        "200":
+          description: Station performance
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StationPerformance"
+
+  /dashboard/top-riders:
+    get:
+      operationId: getTopRiders
+      tags: [dashboard]
+      summary: Get top performing riders
+      responses:
+        "200":
+          description: Top riders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RiderPerformance"
+
+  /dashboard/cod-summary:
+    get:
+      operationId: getCodSummary
+      tags: [dashboard]
+      summary: Get COD collection summary
+      parameters:
+        - name: vendorId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: COD summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +1341,1276 @@ components:
       required:
         - status
 
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required:
+        - user
+        - token
+
+    ChangePasswordBody:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+      required:
+        - currentPassword
+        - newPassword
+
+    ResetPasswordBody:
+      type: object
+      properties:
+        newPassword:
+          type: string
+      required:
+        - newPassword
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [admin, manager, vendor, rider, staff]
+        status:
+          type: string
+          enum: [active, inactive]
+        stationId:
+          type: ["integer", "null"]
+        stationName:
+          type: ["string", "null"]
+        vendorId:
+          type: ["integer", "null"]
+        riderId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - role
+        - status
+        - createdAt
+
+    CreateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        phone:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [admin, manager, vendor, rider, staff]
+        stationId:
+          type: ["integer", "null"]
+      required:
+        - name
+        - email
+        - password
+        - role
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        role:
+          type: string
+        status:
+          type: string
+        stationId:
+          type: ["integer", "null"]
+
+    Station:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          type: ["string", "null"]
+        areaCoverage:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, inactive]
+        riderCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - code
+        - status
+        - riderCount
+        - createdAt
+
+    CreateStationBody:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          type: ["string", "null"]
+        areaCoverage:
+          type: ["string", "null"]
+      required:
+        - name
+        - code
+
+    UpdateStationBody:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          type: ["string", "null"]
+        areaCoverage:
+          type: ["string", "null"]
+        status:
+          type: string
+
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        businessName:
+          type: ["string", "null"]
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        vendorCode:
+          type: string
+        deliveryCharge:
+          type: number
+        status:
+          type: string
+          enum: [active, inactive]
+        userId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - vendorCode
+        - deliveryCharge
+        - status
+        - createdAt
+
+    CreateVendorBody:
+      type: object
+      properties:
+        name:
+          type: string
+        businessName:
+          type: ["string", "null"]
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        vendorCode:
+          type: string
+        deliveryCharge:
+          type: number
+        userId:
+          type: ["integer", "null"]
+      required:
+        - name
+        - email
+        - vendorCode
+        - deliveryCharge
+
+    UpdateVendorBody:
+      type: object
+      properties:
+        name:
+          type: string
+        businessName:
+          type: ["string", "null"]
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        vendorCode:
+          type: string
+        deliveryCharge:
+          type: number
+        status:
+          type: string
+        userId:
+          type: ["integer", "null"]
+
+    Rider:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        vehicleNumber:
+          type: ["string", "null"]
+        stationId:
+          type: ["integer", "null"]
+        stationName:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, inactive]
+        userId:
+          type: ["integer", "null"]
+        assignedCount:
+          type: integer
+        deliveredToday:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - status
+        - assignedCount
+        - deliveredToday
+        - createdAt
+
+    CreateRiderBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        vehicleNumber:
+          type: ["string", "null"]
+        stationId:
+          type: ["integer", "null"]
+        userId:
+          type: ["integer", "null"]
+      required:
+        - name
+        - email
+
+    UpdateRiderBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        vehicleNumber:
+          type: ["string", "null"]
+        stationId:
+          type: ["integer", "null"]
+        status:
+          type: string
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderCode:
+          type: string
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        vendorCode:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        alternatePhone:
+          type: ["string", "null"]
+        productName:
+          type: string
+        productSku:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+        codAmount:
+          type: number
+        deliveryCharge:
+          type: number
+        vendorPayable:
+          type: number
+        address:
+          type: string
+        landmark:
+          type: ["string", "null"]
+        area:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        district:
+          type: ["string", "null"]
+        stationId:
+          type: ["integer", "null"]
+        stationName:
+          type: ["string", "null"]
+        riderId:
+          type: ["integer", "null"]
+        riderName:
+          type: ["string", "null"]
+        priority:
+          type: string
+          enum: [normal, high, urgent]
+        requestedDeliveryTime:
+          type: ["string", "null"]
+        status:
+          type: string
+        duplicateFlag:
+          type: boolean
+        duplicateReason:
+          type: ["string", "null"]
+        matchedOrderId:
+          type: ["integer", "null"]
+        duplicateConfidence:
+          type: ["string", "null"]
+        paymentReleaseStatus:
+          type: string
+          enum: [pending, released]
+        notes:
+          type: ["string", "null"]
+        internalNote:
+          type: ["string", "null"]
+        createdBy:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deliveredAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - orderCode
+        - vendorId
+        - vendorName
+        - vendorCode
+        - customerName
+        - customerPhone
+        - productName
+        - quantity
+        - codAmount
+        - deliveryCharge
+        - vendorPayable
+        - address
+        - priority
+        - status
+        - duplicateFlag
+        - paymentReleaseStatus
+        - createdAt
+        - updatedAt
+
+    OrderDetail:
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/Order"
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        statusHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusHistoryEntry"
+      required:
+        - order
+        - comments
+        - statusHistory
+
+    OrderListResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - orders
+        - total
+        - page
+        - limit
+
+    CreateOrderBody:
+      type: object
+      properties:
+        vendorId:
+          type: integer
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        alternatePhone:
+          type: ["string", "null"]
+        productName:
+          type: string
+        productSku:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+        codAmount:
+          type: number
+        address:
+          type: string
+        landmark:
+          type: ["string", "null"]
+        area:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        district:
+          type: ["string", "null"]
+        stationId:
+          type: ["integer", "null"]
+        priority:
+          type: string
+        requestedDeliveryTime:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - vendorId
+        - customerName
+        - customerPhone
+        - productName
+        - quantity
+        - codAmount
+        - address
+
+    UpdateOrderBody:
+      type: object
+      properties:
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        alternatePhone:
+          type: ["string", "null"]
+        productName:
+          type: string
+        quantity:
+          type: integer
+        codAmount:
+          type: number
+        address:
+          type: string
+        landmark:
+          type: ["string", "null"]
+        area:
+          type: ["string", "null"]
+        stationId:
+          type: ["integer", "null"]
+        priority:
+          type: string
+        notes:
+          type: ["string", "null"]
+        internalNote:
+          type: ["string", "null"]
+
+    AssignOrderBody:
+      type: object
+      properties:
+        riderId:
+          type: integer
+      required:
+        - riderId
+
+    UpdateStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+        comment:
+          type: ["string", "null"]
+      required:
+        - status
+
+    DuplicateActionBody:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [approve, reject, continue]
+        note:
+          type: ["string", "null"]
+      required:
+        - action
+
+    BulkOrderBody:
+      type: object
+      properties:
+        vendorId:
+          type: integer
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOrderBody"
+      required:
+        - vendorId
+        - orders
+
+    BulkOrderResult:
+      type: object
+      properties:
+        created:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkOrderError"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+      required:
+        - created
+        - failed
+        - errors
+        - orders
+
+    BulkOrderError:
+      type: object
+      properties:
+        rowIndex:
+          type: integer
+        field:
+          type: string
+        message:
+          type: string
+      required:
+        - rowIndex
+        - field
+        - message
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userRole:
+          type: string
+        content:
+          type: string
+        visibility:
+          type: string
+          enum: [all, internal, vendor, rider]
+        createdAt:
+          type: string
+      required:
+        - id
+        - orderId
+        - userId
+        - userName
+        - userRole
+        - content
+        - visibility
+        - createdAt
+
+    CreateCommentBody:
+      type: object
+      properties:
+        content:
+          type: string
+        visibility:
+          type: string
+          enum: [all, internal, vendor, rider]
+      required:
+        - content
+
+    StatusHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+        status:
+          type: string
+        changedBy:
+          type: integer
+        changedByName:
+          type: string
+        note:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - orderId
+        - status
+        - changedBy
+        - changedByName
+        - createdAt
+
+    StockEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        productName:
+          type: string
+        productSku:
+          type: ["string", "null"]
+        openingStock:
+          type: integer
+        receivedStock:
+          type: integer
+        deliveredStock:
+          type: integer
+        returnedStock:
+          type: integer
+        damagedStock:
+          type: integer
+        currentStock:
+          type: integer
+        updatedAt:
+          type: string
+      required:
+        - id
+        - vendorId
+        - vendorName
+        - productName
+        - openingStock
+        - receivedStock
+        - deliveredStock
+        - returnedStock
+        - damagedStock
+        - currentStock
+        - updatedAt
+
+    CreateStockBody:
+      type: object
+      properties:
+        vendorId:
+          type: integer
+        productName:
+          type: string
+        productSku:
+          type: ["string", "null"]
+        openingStock:
+          type: integer
+        receivedStock:
+          type: integer
+      required:
+        - vendorId
+        - productName
+        - openingStock
+
+    UpdateStockBody:
+      type: object
+      properties:
+        receivedStock:
+          type: integer
+        damagedStock:
+          type: integer
+        note:
+          type: ["string", "null"]
+
+    BankAccount:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        accountHolderName:
+          type: string
+        bankName:
+          type: string
+        branch:
+          type: ["string", "null"]
+        accountNumber:
+          type: string
+        walletMethod:
+          type: ["string", "null"]
+        remarks:
+          type: ["string", "null"]
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - vendorId
+        - accountHolderName
+        - bankName
+        - accountNumber
+        - isDefault
+        - createdAt
+
+    CreateBankAccountBody:
+      type: object
+      properties:
+        vendorId:
+          type: integer
+        accountHolderName:
+          type: string
+        bankName:
+          type: string
+        branch:
+          type: ["string", "null"]
+        accountNumber:
+          type: string
+        walletMethod:
+          type: ["string", "null"]
+        remarks:
+          type: ["string", "null"]
+        isDefault:
+          type: boolean
+      required:
+        - vendorId
+        - accountHolderName
+        - bankName
+        - accountNumber
+
+    UpdateBankAccountBody:
+      type: object
+      properties:
+        accountHolderName:
+          type: string
+        bankName:
+          type: string
+        branch:
+          type: ["string", "null"]
+        accountNumber:
+          type: string
+        walletMethod:
+          type: ["string", "null"]
+        remarks:
+          type: ["string", "null"]
+        isDefault:
+          type: boolean
+
+    PaymentRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        bankAccountId:
+          type: integer
+        bankAccountInfo:
+          type: string
+        requestedAmount:
+          type: number
+        approvedAmount:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected, released]
+        note:
+          type: ["string", "null"]
+        releaseNote:
+          type: ["string", "null"]
+        referenceId:
+          type: ["string", "null"]
+        paymentDate:
+          type: ["string", "null"]
+        reviewedBy:
+          type: ["integer", "null"]
+        reviewedByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - vendorId
+        - vendorName
+        - bankAccountId
+        - bankAccountInfo
+        - requestedAmount
+        - status
+        - createdAt
+        - updatedAt
+
+    CreatePaymentRequestBody:
+      type: object
+      properties:
+        bankAccountId:
+          type: integer
+        requestedAmount:
+          type: number
+        note:
+          type: ["string", "null"]
+      required:
+        - bankAccountId
+        - requestedAmount
+
+    UpdatePaymentRequestBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, released]
+        approvedAmount:
+          type: ["number", "null"]
+        releaseNote:
+          type: ["string", "null"]
+        referenceId:
+          type: ["string", "null"]
+        paymentDate:
+          type: ["string", "null"]
+
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+        status:
+          type: string
+          enum: [open, in_progress, waiting_reply, resolved, closed]
+        createdBy:
+          type: integer
+        createdByName:
+          type: string
+        createdByRole:
+          type: string
+        assignedTo:
+          type: ["integer", "null"]
+        assignedToName:
+          type: ["string", "null"]
+        messageCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - subject
+        - category
+        - priority
+        - status
+        - createdBy
+        - createdByName
+        - createdByRole
+        - messageCount
+        - createdAt
+        - updatedAt
+
+    TicketDetail:
+      type: object
+      properties:
+        ticket:
+          $ref: "#/components/schemas/Ticket"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketMessage"
+      required:
+        - ticket
+        - messages
+
+    CreateTicketBody:
+      type: object
+      properties:
+        subject:
+          type: string
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+        message:
+          type: string
+      required:
+        - subject
+        - category
+        - priority
+        - message
+
+    UpdateTicketBody:
+      type: object
+      properties:
+        status:
+          type: string
+        assignedTo:
+          type: ["integer", "null"]
+
+    TicketMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        ticketId:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userRole:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - ticketId
+        - userId
+        - userName
+        - userRole
+        - message
+        - createdAt
+
+    CreateTicketMessageBody:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+        relatedId:
+          type: ["integer", "null"]
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - title
+        - message
+        - type
+        - isRead
+        - createdAt
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        userName:
+          type: ["string", "null"]
+        userRole:
+          type: ["string", "null"]
+        action:
+          type: string
+        entity:
+          type: string
+        entityId:
+          type: ["integer", "null"]
+        description:
+          type: string
+        metadata:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - action
+        - entity
+        - description
+        - createdAt
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - logs
+        - total
+        - page
+        - limit
+
+    AdminDashboardSummary:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+        pendingOrders:
+          type: integer
+        assignedOrders:
+          type: integer
+        deliveredOrders:
+          type: integer
+        failedOrders:
+          type: integer
+        returnedOrders:
+          type: integer
+        duplicateFlagged:
+          type: integer
+        codCollectedToday:
+          type: number
+        totalVendorPayable:
+          type: number
+        totalReleasedPayments:
+          type: number
+        activeVendors:
+          type: integer
+        activeRiders:
+          type: integer
+        openTickets:
+          type: integer
+      required:
+        - totalOrders
+        - pendingOrders
+        - assignedOrders
+        - deliveredOrders
+        - failedOrders
+        - returnedOrders
+        - duplicateFlagged
+        - codCollectedToday
+        - totalVendorPayable
+        - totalReleasedPayments
+        - activeVendors
+        - activeRiders
+        - openTickets
+
+    VendorDashboardSummary:
+      type: object
+      properties:
+        todayOrders:
+          type: integer
+        pendingOrders:
+          type: integer
+        deliveredOrders:
+          type: integer
+        failedOrders:
+          type: integer
+        codCollected:
+          type: number
+        payableBalance:
+          type: number
+        releasedPayments:
+          type: number
+        stockInHand:
+          type: integer
+      required:
+        - todayOrders
+        - pendingOrders
+        - deliveredOrders
+        - failedOrders
+        - codCollected
+        - payableBalance
+        - releasedPayments
+        - stockInHand
+
+    RiderDashboardSummary:
+      type: object
+      properties:
+        assignedToday:
+          type: integer
+        deliveredToday:
+          type: integer
+        pendingToday:
+          type: integer
+        failedToday:
+          type: integer
+        codCollectedToday:
+          type: number
+        totalDeliveredAllTime:
+          type: integer
+      required:
+        - assignedToday
+        - deliveredToday
+        - pendingToday
+        - failedToday
+        - codCollectedToday
+        - totalDeliveredAllTime
+
+    OrderTrendPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        total:
+          type: integer
+        delivered:
+          type: integer
+        failed:
+          type: integer
+      required:
+        - date
+        - total
+        - delivered
+        - failed
+
+    StationPerformance:
+      type: object
+      properties:
+        stationId:
+          type: integer
+        stationName:
+          type: string
+        totalOrders:
+          type: integer
+        delivered:
+          type: integer
+        failed:
+          type: integer
+        deliveryRate:
+          type: number
+      required:
+        - stationId
+        - stationName
+        - totalOrders
+        - delivered
+        - failed
+        - deliveryRate
+
+    RiderPerformance:
+      type: object
+      properties:
+        riderId:
+          type: integer
+        riderName:
+          type: string
+        stationName:
+          type: ["string", "null"]
+        deliveredToday:
+          type: integer
+        deliveredTotal:
+          type: integer
+        codCollected:
+          type: number
+        successRate:
+          type: number
+      required:
+        - riderId
+        - riderName
+        - deliveredToday
+        - deliveredTotal
+        - codCollected
+        - successRate
+
+    CodSummary:
+      type: object
+      properties:
+        totalCodCollected:
+          type: number
+        totalDeliveryCharge:
+          type: number
+        totalVendorPayable:
+          type: number
+        totalReleased:
+          type: number
+        pendingRelease:
+          type: number
+      required:
+        - totalCodCollected
+        - totalDeliveryCharge
+        - totalVendorPayable
+        - totalReleased
+        - pendingRelease

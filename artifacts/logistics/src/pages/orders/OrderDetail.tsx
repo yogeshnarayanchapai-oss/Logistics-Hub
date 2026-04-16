@@ -1,0 +1,326 @@
+import { useGetOrder, useListOrderComments, useAddOrderComment, useUpdateOrderStatus, useAssignOrder, useListRiders, getGetOrderQueryKey, getListOrderCommentsQueryKey } from "@workspace/api-client-react";
+import { useParams, Link } from "wouter";
+import { useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Loader2, ArrowLeft, Send, MapPin, Package, User, Clock, AlertTriangle } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+
+export default function OrderDetail() {
+  const { id } = useParams<{ id: string }>();
+  const orderId = parseInt(id || "0", 10);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: orderData, isLoading: orderLoading } = useGetOrder(orderId, {
+    query: {
+      enabled: !!orderId,
+      queryKey: getGetOrderQueryKey(orderId)
+    }
+  });
+
+  const { data: comments, isLoading: commentsLoading } = useListOrderComments(orderId, {
+    query: {
+      enabled: !!orderId,
+      queryKey: getListOrderCommentsQueryKey(orderId)
+    }
+  });
+
+  const [newComment, setNewComment] = useState("");
+  const [commentVisibility, setCommentVisibility] = useState<"all" | "internal" | "vendor" | "rider">("all");
+
+  const addCommentMutation = useAddOrderComment({
+    mutation: {
+      onSuccess: () => {
+        setNewComment("");
+        queryClient.invalidateQueries({ queryKey: getListOrderCommentsQueryKey(orderId) });
+        toast({ title: "Comment added" });
+      },
+      onError: () => {
+        toast({ title: "Failed to add comment", variant: "destructive" });
+      }
+    }
+  });
+
+  const handleAddComment = () => {
+    if (!newComment.trim()) return;
+    addCommentMutation.mutate({
+      id: orderId,
+      data: { content: newComment, visibility: commentVisibility }
+    });
+  };
+
+  const updateStatusMutation = useUpdateOrderStatus({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
+        toast({ title: "Status updated" });
+      }
+    }
+  });
+
+  const handleStatusUpdate = (status: string) => {
+    updateStatusMutation.mutate({ id: orderId, data: { status } });
+  };
+
+  const { data: riders } = useListRiders({ stationId: orderData?.order.stationId || undefined }, {
+    query: {
+      enabled: !!orderData?.order.stationId && ["admin", "manager", "station"].includes(user?.role || "")
+    }
+  });
+
+  const assignRiderMutation = useAssignOrder({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
+        toast({ title: "Rider assigned" });
+      }
+    }
+  });
+
+  const handleAssignRider = (riderId: string) => {
+    assignRiderMutation.mutate({ id: orderId, data: { riderId: parseInt(riderId, 10) } });
+  };
+
+  if (orderLoading || commentsLoading) {
+    return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (!orderData) {
+    return <div>Order not found</div>;
+  }
+
+  const { order, statusHistory } = orderData;
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/orders">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold tracking-tight">{order.orderCode}</h2>
+              <StatusBadge status={order.status} />
+              {order.duplicateFlag && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Duplicate Flagged
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground text-sm">Created on {format(new Date(order.createdAt), "MMM d, yyyy h:mm a")}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {["admin", "manager"].includes(user?.role || "") && (
+            <Select onValueChange={handleStatusUpdate} defaultValue={order.status}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Update Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="under_review">Under Review</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="picked_for_delivery">Picked Up</SelectItem>
+                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="failed_delivery">Failed Delivery</SelectItem>
+                <SelectItem value="reschedule">Reschedule</SelectItem>
+                <SelectItem value="return_pending">Return Pending</SelectItem>
+                <SelectItem value="returned">Returned</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
+          {["admin", "manager", "station"].includes(user?.role || "") && (
+            <Select onValueChange={handleAssignRider} value={order.riderId?.toString() || ""}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Assign Rider" />
+              </SelectTrigger>
+              <SelectContent>
+                {riders?.map(r => (
+                  <SelectItem key={r.id} value={r.id.toString()}>{r.name} ({r.assignedCount} assigned)</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center text-muted-foreground">
+                  <User className="mr-2 h-4 w-4" /> Customer Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-medium text-base">{order.customerName}</div>
+                <div className="text-sm">{order.customerPhone}</div>
+                {order.alternatePhone && <div className="text-sm">{order.alternatePhone}</div>}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center text-muted-foreground">
+                  <Package className="mr-2 h-4 w-4" /> Package Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-medium text-base">{order.productName}</div>
+                <div className="text-sm">Qty: {order.quantity} {order.productSku ? `| SKU: ${order.productSku}` : ''}</div>
+                <div className="text-sm font-medium mt-1">COD: Rs. {order.codAmount.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center text-muted-foreground">
+                <MapPin className="mr-2 h-4 w-4" /> Delivery Address
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-base">{order.address}</div>
+              <div className="text-sm text-muted-foreground">
+                {[order.landmark, order.area, order.city, order.district].filter(Boolean).join(", ")}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Status History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {statusHistory.map((history, i) => (
+                  <div key={history.id} className="flex gap-4 relative">
+                    {i !== statusHistory.length - 1 && (
+                      <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
+                    )}
+                    <div className="relative z-10 w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                    </div>
+                    <div className="pb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium capitalize">{history.status.replace(/_/g, ' ')}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(history.createdAt), "MMM d, h:mm a")}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-0.5">by {history.changedByName}</div>
+                      {history.note && <div className="text-sm mt-1 bg-muted p-2 rounded-md">{history.note}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center text-muted-foreground">
+                <Clock className="mr-2 h-4 w-4" /> Logistics Info
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <div className="text-xs text-muted-foreground">Vendor</div>
+                <div className="font-medium">{order.vendorName}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Assigned Station</div>
+                <div className="font-medium">{order.stationName || "Not assigned"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Assigned Rider</div>
+                <div className="font-medium">{order.riderName || "Not assigned"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Delivery Charge</div>
+                <div className="font-medium">Rs. {order.deliveryCharge.toLocaleString()}</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="flex flex-col h-[500px]">
+            <CardHeader>
+              <CardTitle>Comments</CardTitle>
+              <CardDescription>Order updates and communication</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto space-y-4">
+              {comments?.map((comment) => (
+                <div key={comment.id} className={`p-3 rounded-lg text-sm ${comment.visibility === 'internal' ? 'bg-amber-50 border border-amber-100' : 'bg-muted'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium">{comment.userName}</span>
+                    <span className="text-xs text-muted-foreground">{format(new Date(comment.createdAt), "MMM d, h:mm a")}</span>
+                  </div>
+                  <div className="whitespace-pre-wrap">{comment.content}</div>
+                  {comment.visibility !== 'all' && (
+                    <div className="text-[10px] mt-2 font-medium uppercase text-muted-foreground">{comment.visibility} ONLY</div>
+                  )}
+                </div>
+              ))}
+              {comments?.length === 0 && (
+                <div className="text-center text-muted-foreground text-sm py-4">No comments yet</div>
+              )}
+            </CardContent>
+            <div className="p-4 border-t bg-card mt-auto space-y-3">
+              {["admin", "manager"].includes(user?.role || "") && (
+                <Select value={commentVisibility} onValueChange={(v: any) => setCommentVisibility(v)}>
+                  <SelectTrigger className="h-8 text-xs w-full">
+                    <SelectValue placeholder="Visibility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Visible to everyone</SelectItem>
+                    <SelectItem value="internal">Internal only</SelectItem>
+                    <SelectItem value="vendor">Vendor & Internal</SelectItem>
+                    <SelectItem value="rider">Rider & Internal</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              <Textarea 
+                placeholder="Type a comment..." 
+                className="resize-none min-h-[80px]"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+              />
+              <Button 
+                className="w-full" 
+                onClick={handleAddComment}
+                disabled={!newComment.trim() || addCommentMutation.isPending}
+              >
+                {addCommentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                Post Comment
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

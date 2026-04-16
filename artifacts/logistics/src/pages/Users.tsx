@@ -1,42 +1,59 @@
 import { useState } from "react";
-import { useListUsers, useCreateUser, useUpdateUser, getListUsersQueryKey } from "@workspace/api-client-react";
+import { useListUsers, useCreateUser, useUpdateUser, useDeleteUser, getListUsersQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, User } from "lucide-react";
+import { Loader2, Plus, Search, User, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
 export default function Users() {
+  const { user: currentUser } = useAuth();
   const [search, setSearch] = useState("");
-  const { data: users, isLoading } = useListUsers({ search: search || undefined });
+  const [statusFilter, setStatusFilter] = useState<string>("active");
+
+  const { data: users, isLoading } = useListUsers({
+    search: search || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+  });
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
-  
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+
   const createMutation = useCreateUser({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
-        toast({ title: "User created successfully" });
-        setIsDialogOpen(false);
-      }
+      onSuccess: () => { invalidate(); toast({ title: "User created successfully" }); setIsDialogOpen(false); }
     }
   });
 
   const updateMutation = useUpdateUser({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
-        toast({ title: "User updated successfully" });
-        setIsDialogOpen(false);
-      }
+      onSuccess: () => { invalidate(); toast({ title: "User updated successfully" }); setIsDialogOpen(false); }
+    }
+  });
+
+  const deleteMutation = useDeleteUser({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "User deleted" }); setDeleteTarget(null); },
+      onError: () => { toast({ title: "Delete failed", variant: "destructive" }); setDeleteTarget(null); }
     }
   });
 
@@ -62,26 +79,32 @@ export default function Users() {
     }
   };
 
-  const openNewDialog = () => {
-    setEditingUser(null);
-    setIsDialogOpen(true);
-  };
-
-  const openEditDialog = (user: any) => {
-    setEditingUser(user);
-    setIsDialogOpen(true);
+  const toggleStatus = (u: any) => {
+    const newStatus = u.status === "active" ? "inactive" : "active";
+    updateMutation.mutate(
+      { id: u.id, data: { status: newStatus } },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: `User ${newStatus === "active" ? "activated" : "deactivated"}` });
+        }
+      }
+    );
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'admin': return 'bg-red-100 text-red-800';
-      case 'manager': return 'bg-orange-100 text-orange-800';
-      case 'staff': return 'bg-blue-100 text-blue-800';
-      case 'vendor': return 'bg-purple-100 text-purple-800';
-      case 'rider': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "admin": return "bg-red-100 text-red-800";
+      case "manager": return "bg-orange-100 text-orange-800";
+      case "staff": return "bg-blue-100 text-blue-800";
+      case "vendor": return "bg-purple-100 text-purple-800";
+      case "rider": return "bg-green-100 text-green-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
+
+  const isSelf = (u: any) => u.id === currentUser?.id;
+  const isAdmin = currentUser?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -90,21 +113,38 @@ export default function Users() {
           <h2 className="text-2xl font-bold tracking-tight">System Users</h2>
           <p className="text-muted-foreground">Manage roles and access control.</p>
         </div>
-        <Button onClick={openNewDialog}><Plus className="mr-2 h-4 w-4" /> Add User</Button>
+        {isAdmin && (
+          <Button onClick={() => { setEditingUser(null); setIsDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" /> Add User
+          </Button>
+        )}
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex w-full md:w-1/3 items-center space-x-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full"
-            />
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                placeholder="Search users..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
+
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -121,33 +161,61 @@ export default function Users() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users?.length === 0 ? (
+                  {!users?.length ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No users found.</TableCell>
                     </TableRow>
                   ) : (
-                    users?.map((user) => (
-                      <TableRow key={user.id}>
+                    users.map((u) => (
+                      <TableRow key={u.id} className={u.status === "inactive" ? "opacity-60" : ""}>
                         <TableCell>
                           <div className="font-medium flex items-center gap-2">
                             <User className="h-4 w-4 text-muted-foreground" />
-                            {user.name}
+                            {u.name}
+                            {isSelf(u) && (
+                              <Badge variant="outline" className="text-xs px-1 py-0">You</Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">{user.email}</div>
-                          <div className="text-xs text-muted-foreground">{user.phone}</div>
+                          <div className="text-sm">{u.email}</div>
+                          <div className="text-xs text-muted-foreground">{u.phone}</div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getRoleColor(user.role)}>
-                            {user.role}
-                          </Badge>
+                          <Badge variant="outline" className={getRoleColor(u.role)}>{u.role}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>{user.status}</Badge>
+                          <Badge variant={u.status === "active" ? "default" : "secondary"}>{u.status}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(user)}>Edit</Button>
+                          <div className="flex items-center justify-end gap-1">
+                            {isAdmin && (
+                              <Button variant="ghost" size="sm" onClick={() => { setEditingUser(u); setIsDialogOpen(true); }}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                              </Button>
+                            )}
+                            {isAdmin && !isSelf(u) && (
+                              <Button
+                                variant="ghost" size="sm"
+                                className={u.status === "active" ? "text-orange-600 hover:text-orange-700" : "text-green-600 hover:text-green-700"}
+                                onClick={() => toggleStatus(u)}
+                                disabled={updateMutation.isPending}
+                              >
+                                {u.status === "active"
+                                  ? <><ToggleRight className="h-3.5 w-3.5 mr-1" /> Deactivate</>
+                                  : <><ToggleLeft className="h-3.5 w-3.5 mr-1" /> Activate</>}
+                              </Button>
+                            )}
+                            {isAdmin && !isSelf(u) && (
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget({ id: u.id, name: u.name })}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -159,6 +227,7 @@ export default function Users() {
         </CardContent>
       </Card>
 
+      {/* Edit / Create Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <form onSubmit={handleSave}>
@@ -176,9 +245,8 @@ export default function Users() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Role *</Label>
-                  <select 
-                    id="role" 
-                    name="role" 
+                  <select
+                    id="role" name="role"
                     defaultValue={editingUser?.role || "staff"}
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     required
@@ -208,9 +276,8 @@ export default function Users() {
               {editingUser && (
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
-                  <select 
-                    id="status" 
-                    name="status" 
+                  <select
+                    id="status" name="status"
                     defaultValue={editingUser.status}
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
@@ -223,13 +290,35 @@ export default function Users() {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

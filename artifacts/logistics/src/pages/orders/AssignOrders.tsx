@@ -1,7 +1,7 @@
 import { useListOrders, useListRiders, useAssignOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
-import { format, subDays, startOfDay } from "date-fns";
+import { format } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,20 +18,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2, Search, X, UserCheck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-
-type DatePreset = "all" | "today" | "last7" | "last30" | "custom";
-
-function getDateRange(preset: DatePreset, customFrom: string, customTo: string) {
-  const now = new Date();
-  if (preset === "today") return { dateFrom: startOfDay(now).toISOString(), dateTo: now.toISOString() };
-  if (preset === "last7") return { dateFrom: subDays(now, 7).toISOString(), dateTo: now.toISOString() };
-  if (preset === "last30") return { dateFrom: subDays(now, 30).toISOString(), dateTo: now.toISOString() };
-  if (preset === "custom" && customFrom) return {
-    dateFrom: new Date(customFrom).toISOString(),
-    dateTo: customTo ? new Date(customTo + "T23:59:59").toISOString() : now.toISOString(),
-  };
-  return { dateFrom: undefined, dateTo: undefined };
-}
 
 function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; stationId?: number | null; onAssigned: () => void }) {
   const [open, setOpen] = useState(false);
@@ -56,11 +42,6 @@ function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; sta
       },
     },
   });
-
-  const handleAssign = () => {
-    if (!selectedRider) return;
-    assignMutation.mutate({ id: orderId, data: { riderId: parseInt(selectedRider, 10) } });
-  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -94,7 +75,10 @@ function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; sta
             <Button
               size="sm"
               className="flex-1"
-              onClick={handleAssign}
+              onClick={() => {
+                if (!selectedRider) return;
+                assignMutation.mutate({ id: orderId, data: { riderId: parseInt(selectedRider, 10) } });
+              }}
               disabled={!selectedRider || assignMutation.isPending}
             >
               {assignMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirm"}
@@ -110,25 +94,14 @@ function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; sta
 export default function AssignOrders() {
   const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
   const [page, setPage] = useState(1);
   const limit = 20;
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  const isSearchMode = activeSearch.length > 0;
-  const { dateFrom, dateTo } = useMemo(
-    () => isSearchMode ? { dateFrom: undefined, dateTo: undefined } : getDateRange(datePreset, customFrom, customTo),
-    [isSearchMode, datePreset, customFrom, customTo]
-  );
-
   const queryParams = {
     status: "new",
     search: activeSearch || undefined,
-    dateFrom,
-    dateTo,
     page,
     limit,
   };
@@ -151,8 +124,7 @@ export default function AssignOrders() {
       </div>
 
       <Card>
-        <CardHeader className="pb-3 space-y-3">
-          {/* Search row */}
+        <CardHeader className="pb-3">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -173,46 +145,14 @@ export default function AssignOrders() {
             <Button onClick={handleSearch} className="shrink-0">
               <Search className="mr-2 h-4 w-4" /> Search
             </Button>
-            {isSearchMode && (
+            {activeSearch && (
               <Button variant="outline" onClick={handleClearSearch} className="shrink-0">Clear</Button>
             )}
           </div>
-
-          {/* Filters row */}
-          <div className={`flex flex-wrap gap-3 transition-opacity ${isSearchMode ? "opacity-40 pointer-events-none" : ""}`}>
-            <Select value={datePreset} onValueChange={(v) => { setDatePreset(v as DatePreset); setPage(1); }}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Date range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Dates</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="last7">Last 7 Days</SelectItem>
-                <SelectItem value="last30">Last 30 Days</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {datePreset === "custom" && (
-              <div className="flex items-center gap-2">
-                <Input type="date" value={customFrom} onChange={(e) => { setCustomFrom(e.target.value); setPage(1); }} className="w-[145px]" />
-                <span className="text-muted-foreground text-sm">to</span>
-                <Input type="date" value={customTo} onChange={(e) => { setCustomTo(e.target.value); setPage(1); }} className="w-[145px]" min={customFrom} />
-              </div>
-            )}
-
-            {datePreset !== "today" && (
-              <Button variant="ghost" size="sm" className="text-muted-foreground h-9 px-2"
-                onClick={() => { setDatePreset("today"); setCustomFrom(""); setCustomTo(""); setPage(1); }}>
-                <X className="mr-1 h-3 w-3" /> Reset
-              </Button>
-            )}
-          </div>
-
-          {isSearchMode && (
-            <div className="flex items-center gap-2 text-sm text-primary font-medium">
+          {activeSearch && (
+            <div className="flex items-center gap-2 text-sm text-primary font-medium pt-1">
               <Search className="h-3.5 w-3.5" />
-              Showing results for <span className="font-semibold">"{activeSearch}"</span> — status: New only
+              Results for <span className="font-semibold">"{activeSearch}"</span>
               <button onClick={handleClearSearch} className="underline text-muted-foreground ml-1">cancel</button>
             </div>
           )}
@@ -232,14 +172,13 @@ export default function AssignOrders() {
                     <TableHead>Location</TableHead>
                     <TableHead>Vendor</TableHead>
                     <TableHead>COD Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Assign</TableHead>
+                    <TableHead className="text-right">Assign Rider</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {!data?.orders.length ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                         No unassigned orders found.
                       </TableCell>
                     </TableRow>
@@ -264,7 +203,6 @@ export default function AssignOrders() {
                         </TableCell>
                         <TableCell className="text-sm">{order.vendorName}</TableCell>
                         <TableCell className="font-medium">Rs. {order.codAmount.toLocaleString()}</TableCell>
-                        <TableCell><StatusBadge status={order.status} /></TableCell>
                         <TableCell className="text-right">
                           <AssignButton
                             orderId={order.id}

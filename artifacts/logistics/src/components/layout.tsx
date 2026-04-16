@@ -15,10 +15,18 @@ import {
   Wallet,
   Activity,
   UserCheck,
+  BarChart2,
   UserCircle,
-  BarChart2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
@@ -42,16 +50,18 @@ export function Layout({ children }: LayoutProps) {
     { name: "Stock Inventory", href: "/stock", icon: Package, roles: ["admin", "manager", "vendor"] },
     { name: "Payments", href: "/payments", icon: Wallet, roles: ["admin", "manager", "vendor"] },
     { name: "My Reports", href: "/vendor-report", icon: BarChart2, roles: ["vendor"] },
-
     { name: "Support Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "manager", "vendor", "rider"] },
     { name: "Audit Logs", href: "/audit-logs", icon: Activity, roles: ["admin"] },
-    { name: "Profile", href: "/profile", icon: UserCircle, roles: ["admin", "manager", "vendor", "rider", "staff"] },
     { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
   ];
 
   const filteredNavigation = navigation.filter((item) => 
     item.roles.includes(user.role)
   );
+
+  const initials = user.name
+    ? user.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+    : "U";
 
   return (
     <div className="flex h-screen bg-background">
@@ -105,12 +115,53 @@ export function Layout({ children }: LayoutProps) {
           <h1 className="text-lg font-medium">
             {filteredNavigation.find(n => location === n.href || location.startsWith(n.href + '/'))?.name || 'Dashboard'}
           </h1>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2">
+            {/* Notifications */}
             <Link href="/notifications">
-              <Button variant="ghost" size="icon" className="relative text-gray-500 hover:text-gray-900">
+              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
                 <Bell className="h-5 w-5" />
               </Button>
             </Link>
+
+            {/* Profile dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-semibold">
+                  {initials}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-sm font-semibold">{user.name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{user.role} · {user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <Link href="/profile">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    My Profile
+                  </DropdownMenuItem>
+                </Link>
+                {user.role === "admin" && (
+                  <Link href="/settings">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </DropdownMenuItem>
+                  </Link>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                  onClick={() => logout()}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 

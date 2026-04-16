@@ -14,6 +14,7 @@ import OrdersList from "@/pages/orders/OrdersList";
 import OrderDetail from "@/pages/orders/OrderDetail";
 import NewOrder from "@/pages/orders/NewOrder";
 import BulkOrder from "@/pages/orders/BulkOrder";
+import EditOrder from "@/pages/orders/EditOrder";
 import AssignOrders from "@/pages/orders/AssignOrders";
 import DuplicateReview from "@/pages/DuplicateReview";
 import Vendors from "@/pages/Vendors";
@@ -79,6 +80,7 @@ function Router() {
       <Route path="/orders/new"><ProtectedRoute component={NewOrder} /></Route>
       <Route path="/orders/bulk"><ProtectedRoute component={BulkOrder} roles={["admin", "manager", "vendor"]} /></Route>
       <Route path="/assign-orders"><ProtectedRoute component={AssignOrders} roles={["admin", "manager"]} /></Route>
+      <Route path="/orders/:id/edit"><ProtectedRoute component={EditOrder} roles={["admin", "manager"]} /></Route>
       <Route path="/orders/:id"><ProtectedRoute component={OrderDetail} /></Route>
       <Route path="/duplicate-review"><ProtectedRoute component={DuplicateReview} roles={["admin", "manager"]} /></Route>
       <Route path="/vendors"><ProtectedRoute component={Vendors} roles={["admin", "manager"]} /></Route>

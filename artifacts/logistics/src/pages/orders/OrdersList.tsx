@@ -1,4 +1,4 @@
-import { useListOrders } from "@workspace/api-client-react";
+import { useListOrders, useDeleteOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useState, useRef, useMemo } from "react";
 import { Link } from "wouter";
@@ -6,56 +6,59 @@ import { format, subDays, startOfDay } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Loader2, Plus, Search, X } from "lucide-react";
+import { Loader2, Plus, Search, X, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 type DatePreset = "all" | "today" | "last7" | "last30" | "custom";
 
 function getDateRange(preset: DatePreset, customFrom: string, customTo: string) {
   const now = new Date();
-  if (preset === "today") {
-    return { dateFrom: startOfDay(now).toISOString(), dateTo: now.toISOString() };
-  }
-  if (preset === "last7") {
-    return { dateFrom: subDays(now, 7).toISOString(), dateTo: now.toISOString() };
-  }
-  if (preset === "last30") {
-    return { dateFrom: subDays(now, 30).toISOString(), dateTo: now.toISOString() };
-  }
-  if (preset === "custom" && customFrom) {
-    return {
-      dateFrom: new Date(customFrom).toISOString(),
-      dateTo: customTo ? new Date(customTo + "T23:59:59").toISOString() : now.toISOString(),
-    };
-  }
+  if (preset === "today") return { dateFrom: startOfDay(now).toISOString(), dateTo: now.toISOString() };
+  if (preset === "last7") return { dateFrom: subDays(now, 7).toISOString(), dateTo: now.toISOString() };
+  if (preset === "last30") return { dateFrom: subDays(now, 30).toISOString(), dateTo: now.toISOString() };
+  if (preset === "custom" && customFrom) return {
+    dateFrom: new Date(customFrom).toISOString(),
+    dateTo: customTo ? new Date(customTo + "T23:59:59").toISOString() : now.toISOString(),
+  };
   return { dateFrom: undefined, dateTo: undefined };
 }
 
 export default function OrdersList() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Search state — committed only when user clicks the Search button
   const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-
-  // Filters — only applied when no active search
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-
   const [page, setPage] = useState(1);
   const limit = 20;
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // When search is active, bypass all filters
+  // Multi-select
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; code: string } | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
   const isSearchMode = activeSearch.length > 0;
 
   const { dateFrom, dateTo } = useMemo(
@@ -63,30 +66,76 @@ export default function OrdersList() {
     [isSearchMode, datePreset, customFrom, customTo]
   );
 
-  const { data, isLoading } = useListOrders({
+  const queryParams = {
     search: activeSearch || undefined,
     status: (!isSearchMode && statusFilter !== "all") ? statusFilter : undefined,
     dateFrom,
     dateTo,
     page,
     limit,
-  });
-
-  const handleSearch = () => {
-    setActiveSearch(searchInput.trim());
-    setPage(1);
   };
 
-  const handleClearSearch = () => {
-    setSearchInput("");
-    setActiveSearch("");
-    setPage(1);
-    searchRef.current?.focus();
+  const { data, isLoading } = useListOrders(queryParams);
+  const deleteMutation = useDeleteOrder();
+
+  const orders = data?.orders ?? [];
+  const allPageIds = orders.map((o) => o.id);
+  const allChecked = allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
+  const someChecked = allPageIds.some((id) => selectedIds.has(id));
+
+  const toggleAll = () => {
+    if (allChecked) {
+      setSelectedIds((prev) => { const n = new Set(prev); allPageIds.forEach((id) => n.delete(id)); return n; });
+    } else {
+      setSelectedIds((prev) => new Set([...prev, ...allPageIds]));
+    }
+  };
+  const toggleOne = (id: number) => {
+    setSelectedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
-  const handleFilterChange = () => {
-    setPage(1);
+  const handleSearch = () => { setActiveSearch(searchInput.trim()); setPage(1); };
+  const handleClearSearch = () => { setSearchInput(""); setActiveSearch(""); setPage(1); searchRef.current?.focus(); };
+  const handleFilterChange = () => setPage(1);
+
+  const invalidateOrders = () => {
+    queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
   };
+
+  // Single delete
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate({ id: deleteTarget.id }, {
+      onSuccess: () => {
+        toast({ title: "Order deleted", description: `${deleteTarget.code} has been deleted.` });
+        setDeleteTarget(null);
+        setSelectedIds((prev) => { const n = new Set(prev); n.delete(deleteTarget.id); return n; });
+        invalidateOrders();
+      },
+      onError: () => {
+        toast({ title: "Delete failed", variant: "destructive" });
+        setDeleteTarget(null);
+      },
+    });
+  };
+
+  // Bulk delete
+  const [bulkDeletePending, setBulkDeletePending] = useState(false);
+  const handleBulkDeleteConfirm = async () => {
+    setBulkDeletePending(true);
+    let success = 0;
+    for (const id of selectedIds) {
+      try { await deleteMutation.mutateAsync({ id }); success++; } catch { /* continue */ }
+    }
+    setBulkDeletePending(false);
+    setBulkDeleteOpen(false);
+    setSelectedIds(new Set());
+    invalidateOrders();
+    toast({ title: `${success} order${success !== 1 ? "s" : ""} deleted` });
+  };
+
+  const canEdit = ["admin", "manager"].includes(user?.role || "");
+  const canDelete = user?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -124,28 +173,21 @@ export default function OrdersList() {
                 className="pl-9 pr-8"
               />
               {searchInput && (
-                <button
-                  onClick={handleClearSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
+                <button onClick={handleClearSearch} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
             <Button onClick={handleSearch} className="shrink-0">
-              <Search className="mr-2 h-4 w-4" />
-              Search
+              <Search className="mr-2 h-4 w-4" /> Search
             </Button>
             {isSearchMode && (
-              <Button variant="outline" onClick={handleClearSearch} className="shrink-0">
-                Clear
-              </Button>
+              <Button variant="outline" onClick={handleClearSearch} className="shrink-0">Clear</Button>
             )}
           </div>
 
-          {/* Filters row — dimmed when search is active */}
+          {/* Filters row */}
           <div className={`flex flex-wrap gap-3 transition-opacity ${isSearchMode ? "opacity-40 pointer-events-none" : ""}`}>
-            {/* Status */}
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); handleFilterChange(); }}>
               <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Status" />
@@ -168,7 +210,6 @@ export default function OrdersList() {
               </SelectContent>
             </Select>
 
-            {/* Date preset */}
             <Select value={datePreset} onValueChange={(v) => { setDatePreset(v as DatePreset); handleFilterChange(); }}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Date range" />
@@ -182,40 +223,22 @@ export default function OrdersList() {
               </SelectContent>
             </Select>
 
-            {/* Custom date inputs */}
             {datePreset === "custom" && (
               <div className="flex items-center gap-2">
-                <Input
-                  type="date"
-                  value={customFrom}
-                  onChange={(e) => { setCustomFrom(e.target.value); handleFilterChange(); }}
-                  className="w-[145px]"
-                />
+                <Input type="date" value={customFrom} onChange={(e) => { setCustomFrom(e.target.value); handleFilterChange(); }} className="w-[145px]" />
                 <span className="text-muted-foreground text-sm">to</span>
-                <Input
-                  type="date"
-                  value={customTo}
-                  onChange={(e) => { setCustomTo(e.target.value); handleFilterChange(); }}
-                  className="w-[145px]"
-                  min={customFrom}
-                />
+                <Input type="date" value={customTo} onChange={(e) => { setCustomTo(e.target.value); handleFilterChange(); }} className="w-[145px]" min={customFrom} />
               </div>
             )}
 
-            {/* Active filter badges */}
-            {(statusFilter !== "all" || datePreset !== "all") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground h-9 px-2"
-                onClick={() => { setStatusFilter("all"); setDatePreset("today"); setCustomFrom(""); setCustomTo(""); handleFilterChange(); }}
-              >
+            {(statusFilter !== "all" || datePreset !== "today") && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground h-9 px-2"
+                onClick={() => { setStatusFilter("all"); setDatePreset("today"); setCustomFrom(""); setCustomTo(""); handleFilterChange(); }}>
                 <X className="mr-1 h-3 w-3" /> Reset filters
               </Button>
             )}
           </div>
 
-          {/* Active mode indicator */}
           {isSearchMode && (
             <div className="flex items-center gap-2 text-sm text-primary font-medium">
               <Search className="h-3.5 w-3.5" />
@@ -225,7 +248,25 @@ export default function OrdersList() {
           )}
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+              <span className="text-sm font-medium text-destructive shrink-0">
+                {selectedIds.size} order{selectedIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <div className="flex-1" />
+              {canDelete && (
+                <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setBulkDeleteOpen(true)}>
+                  <Trash2 className="h-3.5 w-3.5" /> Delete Selected
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="text-muted-foreground">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : (
@@ -233,6 +274,16 @@ export default function OrdersList() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {canDelete && (
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allChecked}
+                          onCheckedChange={toggleAll}
+                          aria-label="Select all"
+                          data-state={someChecked && !allChecked ? "indeterminate" : undefined}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Order Code</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Customer</TableHead>
@@ -243,15 +294,24 @@ export default function OrdersList() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {!data?.orders.length ? (
+                  {!orders.length ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={canDelete ? 8 : 7} className="text-center py-12 text-muted-foreground">
                         No orders found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data.orders.map((order) => (
-                      <TableRow key={order.id}>
+                    orders.map((order) => (
+                      <TableRow key={order.id} className={selectedIds.has(order.id) ? "bg-red-50" : ""}>
+                        {canDelete && (
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedIds.has(order.id)}
+                              onCheckedChange={() => toggleOne(order.id)}
+                              aria-label={`Select ${order.orderCode}`}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="font-medium">
                           <Link href={`/orders/${order.id}`} className="text-primary hover:underline">
                             {order.orderCode}
@@ -272,13 +332,29 @@ export default function OrdersList() {
                           <div className="text-xs text-muted-foreground">{order.city}</div>
                         </TableCell>
                         <TableCell className="font-medium">Rs. {order.codAmount.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <StatusBadge status={order.status} />
-                        </TableCell>
+                        <TableCell><StatusBadge status={order.status} /></TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/orders/${order.id}`}>
-                            <Button variant="ghost" size="sm">View</Button>
-                          </Link>
+                          <div className="flex items-center justify-end gap-1">
+                            <Link href={`/orders/${order.id}`}>
+                              <Button variant="ghost" size="sm">View</Button>
+                            </Link>
+                            {canEdit && (
+                              <Link href={`/orders/${order.id}/edit`}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </Link>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget({ id: order.id, code: order.orderCode })}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -288,28 +364,57 @@ export default function OrdersList() {
             </div>
           )}
 
-          {/* Pagination */}
           {data && data.total > 0 && (
-            <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center justify-between pt-2">
               <div className="text-sm text-muted-foreground">
-                {data.total === 0
-                  ? "No results"
-                  : `Showing ${(page - 1) * limit + 1}–${Math.min(page * limit, data.total)} of ${data.total} orders`}
+                {`Showing ${(page - 1) * limit + 1}–${Math.min(page * limit, data.total)} of ${data.total} orders`}
               </div>
               {data.total > limit && (
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                    Previous
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page * limit >= data.total}>
-                    Next
-                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page * limit >= data.total}>Next</Button>
                 </div>
               )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Single delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.code}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Orders</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{selectedIds.size} selected order{selectedIds.size !== 1 ? "s" : ""}</strong>? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDeleteConfirm} className="bg-destructive hover:bg-destructive/90" disabled={bulkDeletePending}>
+              {bulkDeletePending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Delete ${selectedIds.size} Orders`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

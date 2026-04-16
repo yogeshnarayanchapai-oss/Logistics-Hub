@@ -1,5 +1,6 @@
 import { useListOrders, useDeleteOrder, useAssignOrder, useListRiders, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useState, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { format, subDays, startOfDay } from "date-fns";
@@ -46,6 +47,7 @@ function getDateRange(preset: DatePreset, customFrom: string, customTo: string) 
 
 export default function OrdersList() {
   const { user } = useAuth();
+  const prefix = useRolePrefix();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -175,10 +177,10 @@ export default function OrdersList() {
         <div className="flex items-center gap-2">
           {["admin", "manager", "vendor"].includes(user?.role || "") && (
             <>
-              <Link href="/orders/bulk">
+              <Link href={`${prefix}/orders/bulk`}>
                 <Button variant="outline">Bulk Import</Button>
               </Link>
-              <Link href="/orders/new">
+              <Link href={`${prefix}/orders/new`}>
                 <Button><Plus className="mr-2 h-4 w-4" /> Create Order</Button>
               </Link>
             </>

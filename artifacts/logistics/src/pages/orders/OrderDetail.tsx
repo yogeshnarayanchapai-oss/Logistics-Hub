@@ -2,6 +2,7 @@ import { useGetOrder, useListOrderComments, useAddOrderComment, useUpdateOrderSt
 import { useParams, Link } from "wouter";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -23,6 +24,7 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const orderId = parseInt(id || "0", 10);
   const { user } = useAuth();
+  const prefix = useRolePrefix();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -118,7 +120,7 @@ export default function OrderDetail() {
           <h3 className="font-semibold text-lg">Order Not Assigned to You</h3>
           <p className="text-sm text-muted-foreground mt-1">You can only view and update orders assigned to you.</p>
         </div>
-        <Link href="/orders">
+        <Link href={`${prefix}/orders`}>
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Deliveries
           </Button>
@@ -131,7 +133,7 @@ export default function OrderDetail() {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/orders">
+          <Link href={`${prefix}/orders`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth";
+import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useQueryClient } from "@tanstack/react-query";
 import { useListVendors, useListStations, useCreateBulkOrders, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { Link } from "wouter";
@@ -52,6 +53,7 @@ function makeEmptyRow(): BulkOrderRow {
 
 export default function BulkOrder() {
   const { user } = useAuth();
+  const prefix = useRolePrefix();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isVendor = user?.role === "vendor";
@@ -245,7 +247,7 @@ export default function BulkOrder() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/orders">
+        <Link href={`${prefix}/orders`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-5 w-5" />
           </Button>

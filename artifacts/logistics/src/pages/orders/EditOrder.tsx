@@ -1,6 +1,7 @@
 import { useParams, Link, useLocation } from "wouter";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
+import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,6 +45,7 @@ export default function EditOrder() {
   const { id } = useParams<{ id: string }>();
   const orderId = parseInt(id || "0", 10);
   const { user } = useAuth();
+  const prefix = useRolePrefix();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -91,7 +93,7 @@ export default function EditOrder() {
         queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
         toast({ title: "Order updated", description: "Changes saved successfully." });
-        setLocation(`/orders/${orderId}`);
+        setLocation(`${prefix}/orders/${orderId}`);
       },
       onError: (err: any) => {
         toast({ title: "Failed to update", description: err.message, variant: "destructive" });
@@ -123,7 +125,7 @@ export default function EditOrder() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/orders">
+        <Link href={`${prefix}/orders`}>
           <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
         </Link>
         <div>

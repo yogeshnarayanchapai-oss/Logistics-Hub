@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -50,6 +51,7 @@ type OrderFormValues = z.infer<typeof orderSchema>;
 
 export default function NewOrder() {
   const { user } = useAuth();
+  const prefix = useRolePrefix();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -89,7 +91,7 @@ export default function NewOrder() {
       onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
         toast({ title: "Order created", description: `Order ${data.orderCode} has been created successfully.` });
-        setLocation(`/orders/${data.id}`);
+        setLocation(`${prefix}/orders/${data.id}`);
       },
       onError: (err: any) => {
         toast({ title: "Failed to create order", description: err.message, variant: "destructive" });
@@ -109,7 +111,7 @@ export default function NewOrder() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/orders">
+        <Link href={`${prefix}/orders`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -269,7 +271,7 @@ export default function NewOrder() {
         </div>
 
         <div className="flex justify-end gap-4">
-          <Link href="/orders">
+          <Link href={`${prefix}/orders`}>
             <Button type="button" variant="outline">Cancel</Button>
           </Link>
           <Button type="submit" disabled={createOrderMutation.isPending} size="lg">

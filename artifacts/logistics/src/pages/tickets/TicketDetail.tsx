@@ -2,6 +2,7 @@ import { useGetTicket, useAddTicketMessage, getGetTicketQueryKey, useUpdateTicke
 import { useParams, Link } from "wouter";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const ticketId = parseInt(id || "0", 10);
   const { user } = useAuth();
+  const prefix = useRolePrefix();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -100,7 +102,7 @@ export default function TicketDetail() {
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/tickets">
+          <Link href={`${prefix}/tickets`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>

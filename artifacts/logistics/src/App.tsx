@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider, useAuth, getRoleHome } from "@/lib/auth";
 import { Layout } from "@/components/layout";
 
 // Pages
@@ -36,7 +36,11 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ component: Component, roles }: { component: any, roles?: string[] }) {
+const ADMIN_ROLES = ["admin", "manager", "staff"];
+const VENDOR_ROLES = ["vendor"];
+const RIDER_ROLES = ["rider"];
+
+function ProtectedRoute({ component: Component, roles }: { component: any; roles?: string[] }) {
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -44,7 +48,7 @@ function ProtectedRoute({ component: Component, roles }: { component: any, roles
     if (!isLoading && !user) {
       setLocation("/login");
     } else if (!isLoading && user && roles && !roles.includes(user.role)) {
-      setLocation("/dashboard");
+      setLocation(getRoleHome(user.role));
     }
   }, [isLoading, user]);
 
@@ -66,40 +70,78 @@ function ProtectedRoute({ component: Component, roles }: { component: any, roles
   );
 }
 
-function RedirectToDashboard() {
+function RootRedirect() {
+  const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
-  useEffect(() => { setLocation("/dashboard"); }, []);
-  return null;
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (user) setLocation(getRoleHome(user.role));
+      else setLocation("/login");
+    }
+  }, [isLoading, user]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 }
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/" component={RedirectToDashboard} />
-      <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
-      <Route path="/orders"><ProtectedRoute component={OrdersList} /></Route>
-      <Route path="/orders/new"><ProtectedRoute component={NewOrder} /></Route>
-      <Route path="/orders/bulk"><ProtectedRoute component={BulkOrder} roles={["admin", "manager", "vendor"]} /></Route>
-      <Route path="/assign-orders"><ProtectedRoute component={AssignOrders} roles={["admin", "manager"]} /></Route>
-      <Route path="/orders/:id/edit"><ProtectedRoute component={EditOrder} roles={["admin", "manager"]} /></Route>
-      <Route path="/orders/:id"><ProtectedRoute component={OrderDetail} /></Route>
-      <Route path="/duplicate-review"><ProtectedRoute component={DuplicateReview} roles={["admin", "manager"]} /></Route>
-      <Route path="/vendors"><ProtectedRoute component={Vendors} roles={["admin", "manager"]} /></Route>
-      <Route path="/riders"><ProtectedRoute component={Riders} roles={["admin", "manager", "station"]} /></Route>
-      <Route path="/stations"><ProtectedRoute component={Stations} roles={["admin", "manager"]} /></Route>
-      <Route path="/users"><ProtectedRoute component={Users} roles={["admin"]} /></Route>
-      <Route path="/stock"><ProtectedRoute component={Stock} roles={["admin", "manager", "vendor"]} /></Route>
-      <Route path="/payments"><ProtectedRoute component={Payments} roles={["admin", "manager", "vendor"]} /></Route>
-      <Route path="/vendor-report"><ProtectedRoute component={VendorReport} roles={["vendor"]} /></Route>
-      <Route path="/vendor-comments"><ProtectedRoute component={VendorComments} roles={["vendor"]} /></Route>
-      <Route path="/bank-accounts"><ProtectedRoute component={BankAccounts} roles={["admin", "vendor"]} /></Route>
-      <Route path="/tickets"><ProtectedRoute component={TicketsList} /></Route>
-      <Route path="/tickets/:id"><ProtectedRoute component={TicketDetail} /></Route>
-      <Route path="/notifications"><ProtectedRoute component={Notifications} /></Route>
-      <Route path="/audit-logs"><ProtectedRoute component={AuditLogs} roles={["admin"]} /></Route>
-      <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
-      <Route path="/settings"><ProtectedRoute component={Settings} roles={["admin"]} /></Route>
+      <Route path="/" component={RootRedirect} />
+
+      {/* ── ADMIN / MANAGER / STAFF portal ── */}
+      <Route path="/admin/dashboard"><ProtectedRoute component={Dashboard} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/orders"><ProtectedRoute component={OrdersList} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/orders/new"><ProtectedRoute component={NewOrder} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/orders/bulk"><ProtectedRoute component={BulkOrder} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/orders/:id/edit"><ProtectedRoute component={EditOrder} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/orders/:id"><ProtectedRoute component={OrderDetail} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/assign-orders"><ProtectedRoute component={AssignOrders} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/duplicate-review"><ProtectedRoute component={DuplicateReview} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/vendors"><ProtectedRoute component={Vendors} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/riders"><ProtectedRoute component={Riders} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/stations"><ProtectedRoute component={Stations} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/users"><ProtectedRoute component={Users} roles={["admin"]} /></Route>
+      <Route path="/admin/stock"><ProtectedRoute component={Stock} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/payments"><ProtectedRoute component={Payments} roles={["admin", "manager"]} /></Route>
+      <Route path="/admin/bank-accounts"><ProtectedRoute component={BankAccounts} roles={["admin"]} /></Route>
+      <Route path="/admin/tickets"><ProtectedRoute component={TicketsList} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/tickets/:id"><ProtectedRoute component={TicketDetail} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/notifications"><ProtectedRoute component={Notifications} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/audit-logs"><ProtectedRoute component={AuditLogs} roles={["admin"]} /></Route>
+      <Route path="/admin/profile"><ProtectedRoute component={Profile} roles={[...ADMIN_ROLES]} /></Route>
+      <Route path="/admin/settings"><ProtectedRoute component={Settings} roles={["admin"]} /></Route>
+
+      {/* ── VENDOR portal ── */}
+      <Route path="/vendor/dashboard"><ProtectedRoute component={Dashboard} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/orders"><ProtectedRoute component={OrdersList} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/orders/new"><ProtectedRoute component={NewOrder} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/orders/bulk"><ProtectedRoute component={BulkOrder} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/orders/:id"><ProtectedRoute component={OrderDetail} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/stock"><ProtectedRoute component={Stock} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/payments"><ProtectedRoute component={Payments} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/bank-accounts"><ProtectedRoute component={BankAccounts} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/reports"><ProtectedRoute component={VendorReport} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/comments"><ProtectedRoute component={VendorComments} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/tickets"><ProtectedRoute component={TicketsList} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/tickets/:id"><ProtectedRoute component={TicketDetail} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/notifications"><ProtectedRoute component={Notifications} roles={[...VENDOR_ROLES]} /></Route>
+      <Route path="/vendor/profile"><ProtectedRoute component={Profile} roles={[...VENDOR_ROLES]} /></Route>
+
+      {/* ── RIDER portal ── */}
+      <Route path="/rider/dashboard"><ProtectedRoute component={Dashboard} roles={[...RIDER_ROLES]} /></Route>
+      <Route path="/rider/orders"><ProtectedRoute component={OrdersList} roles={[...RIDER_ROLES]} /></Route>
+      <Route path="/rider/orders/:id"><ProtectedRoute component={OrderDetail} roles={[...RIDER_ROLES]} /></Route>
+      <Route path="/rider/tickets"><ProtectedRoute component={TicketsList} roles={[...RIDER_ROLES]} /></Route>
+      <Route path="/rider/tickets/:id"><ProtectedRoute component={TicketDetail} roles={[...RIDER_ROLES]} /></Route>
+      <Route path="/rider/notifications"><ProtectedRoute component={Notifications} roles={[...RIDER_ROLES]} /></Route>
+      <Route path="/rider/profile"><ProtectedRoute component={Profile} roles={[...RIDER_ROLES]} /></Route>
+
       <Route component={NotFound} />
     </Switch>
   );

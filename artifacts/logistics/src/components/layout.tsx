@@ -52,7 +52,6 @@ export function Layout({ children }: LayoutProps) {
     { name: "My Reports", href: "/vendor-report", icon: BarChart2, roles: ["vendor"] },
     { name: "Support Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "manager", "vendor", "rider"] },
     { name: "Audit Logs", href: "/audit-logs", icon: Activity, roles: ["admin"] },
-    { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
   ];
 
   const filteredNavigation = navigation.filter((item) => 

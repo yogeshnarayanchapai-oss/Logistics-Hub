@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Search, User, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
@@ -190,30 +191,43 @@ export default function Users() {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {isAdmin && (
-                              <Button variant="ghost" size="sm" onClick={() => { setEditingUser(u); setIsDialogOpen(true); }}>
-                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => { setEditingUser(u); setIsDialogOpen(true); }}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit</TooltipContent>
+                              </Tooltip>
                             )}
                             {isAdmin && !isSelf(u) && (
-                              <Button
-                                variant="ghost" size="sm"
-                                className={u.status === "active" ? "text-orange-600 hover:text-orange-700" : "text-green-600 hover:text-green-700"}
-                                onClick={() => toggleStatus(u)}
-                                disabled={updateMutation.isPending}
-                              >
-                                {u.status === "active"
-                                  ? <><ToggleRight className="h-3.5 w-3.5 mr-1" /> Deactivate</>
-                                  : <><ToggleLeft className="h-3.5 w-3.5 mr-1" /> Activate</>}
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost" size="icon"
+                                    className={`h-8 w-8 ${u.status === "active" ? "text-orange-500 hover:text-orange-700" : "text-green-600 hover:text-green-700"}`}
+                                    onClick={() => toggleStatus(u)}
+                                    disabled={updateMutation.isPending}
+                                  >
+                                    {u.status === "active" ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>{u.status === "active" ? "Deactivate" : "Activate"}</TooltipContent>
+                              </Tooltip>
                             )}
                             {isAdmin && !isSelf(u) && (
-                              <Button
-                                variant="ghost" size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDeleteTarget({ id: u.id, name: u.name })}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost" size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() => setDeleteTarget({ id: u.id, name: u.name })}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete</TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         </TableCell>

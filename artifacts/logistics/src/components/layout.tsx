@@ -14,8 +14,7 @@ import {
   Ticket,
   Wallet,
   Activity,
-  FileSpreadsheet,
-  AlertTriangle,
+  UserCheck,
   UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,8 +33,7 @@ export function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "vendor", "rider", "staff"] },
     { name: "Orders", href: "/orders", icon: Package, roles: ["admin", "manager", "vendor", "rider", "staff"] },
-    { name: "Bulk Entry", href: "/orders/bulk", icon: FileSpreadsheet, roles: ["admin", "manager", "vendor"] },
-    { name: "Duplicate Review", href: "/duplicate-review", icon: AlertTriangle, roles: ["admin", "manager"] },
+    { name: "Assign Orders", href: "/assign-orders", icon: UserCheck, roles: ["admin", "manager"] },
     { name: "Vendors", href: "/vendors", icon: Building2, roles: ["admin", "manager"] },
     { name: "Riders", href: "/riders", icon: Truck, roles: ["admin", "manager", "station"] },
     { name: "Stations", href: "/stations", icon: MapPin, roles: ["admin", "manager"] },

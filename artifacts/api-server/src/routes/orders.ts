@@ -355,13 +355,27 @@ router.patch("/orders/:id", requireAuth, requireRole("admin", "manager"), async 
   res.json(await formatOrder(order));
 });
 
-router.delete("/orders/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+router.delete("/orders/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).userId as number;
+  const userRole = (req as any).userRole as string;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  const [order] = await db.delete(ordersTable).where(eq(ordersTable.id, id)).returning();
-  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
-  await createAuditLog({ userId, action: "delete", entity: "order", entityId: id, description: `Deleted order ${order.orderCode}` });
+
+  // Fetch order first to check permissions
+  const [existing] = await db.select().from(ordersTable).where(eq(ordersTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Order not found" }); return; }
+
+  if (userRole === "vendor") {
+    // Vendor can only delete their own unassigned orders
+    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
+    if (!vendor || vendor.id !== existing.vendorId) { res.status(403).json({ error: "Forbidden" }); return; }
+    if (existing.riderId) { res.status(403).json({ error: "Cannot delete an order that has already been assigned to a rider." }); return; }
+  } else if (userRole !== "admin") {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+
+  await db.delete(ordersTable).where(eq(ordersTable.id, id));
+  await createAuditLog({ userId, action: "delete", entity: "order", entityId: id, description: `Deleted order ${existing.orderCode}` });
   res.sendStatus(204);
 });
 

@@ -210,6 +210,9 @@ export default function OrdersList() {
 
   const canEdit = ["admin", "manager"].includes(user?.role || "");
   const canDelete = user?.role === "admin";
+  // Vendors can delete only their own unassigned orders
+  const canDeleteOrder = (order: any) =>
+    user?.role === "admin" || (user?.role === "vendor" && !order.riderId);
 
   return (
     <div className="space-y-6">
@@ -499,7 +502,7 @@ export default function OrdersList() {
                                   >
                                     <MessageSquare className="mr-2 h-4 w-4" /> Add Comment
                                   </DropdownMenuItem>
-                                  {canDelete && (
+                                  {canDeleteOrder(order) && (
                                     <>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem

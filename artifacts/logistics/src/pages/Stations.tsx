@@ -15,8 +15,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, MapPin, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Loader2, Plus, MapPin, Pencil, Trash2, ToggleLeft, ToggleRight, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
@@ -166,47 +169,42 @@ export default function Stations() {
                           <Badge variant={station.status === "active" ? "default" : "secondary"}>{station.status}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {canManage && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => { setEditingStation(station); setIsDialogOpen(true); }}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Edit</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {canManage && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost" size="icon"
-                                    className={`h-8 w-8 ${station.status === "active" ? "text-orange-500 hover:text-orange-700" : "text-green-600 hover:text-green-700"}`}
-                                    onClick={() => toggleStatus(station)}
-                                    disabled={updateMutation.isPending}
-                                  >
-                                    {station.status === "active" ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>{station.status === "active" ? "Deactivate" : "Activate"}</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {isAdmin && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost" size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {canManage && (
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => { setEditingStation(station); setIsDialogOpen(true); }}>
+                                  <Pencil className="mr-2 h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                              )}
+                              {canManage && (
+                                <DropdownMenuItem
+                                  className={`cursor-pointer ${station.status === "active" ? "text-orange-600 focus:text-orange-700" : "text-green-700 focus:text-green-700"}`}
+                                  onClick={() => toggleStatus(station)}
+                                  disabled={updateMutation.isPending}
+                                >
+                                  {station.status === "active"
+                                    ? <><ToggleRight className="mr-2 h-4 w-4" /> Deactivate</>
+                                    : <><ToggleLeft className="mr-2 h-4 w-4" /> Activate</>}
+                                </DropdownMenuItem>
+                              )}
+                              {isAdmin && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="cursor-pointer text-destructive focus:text-destructive"
                                     onClick={() => setDeleteTarget({ id: station.id, name: station.name })}
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete</TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))

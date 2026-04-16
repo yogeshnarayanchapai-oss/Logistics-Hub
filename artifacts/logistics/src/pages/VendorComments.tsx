@@ -1,17 +1,42 @@
 import { useState } from "react";
-import { useListVendorComments } from "@workspace/api-client-react";
+import { useListVendorComments, useAddOrderComment } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useRolePrefix } from "@/lib/use-role-prefix";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Search, MessageSquare, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Loader2, Search, MessageSquare, Filter, CornerDownRight } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function VendorComments() {
   const [search, setSearch] = useState("");
+  const prefix = useRolePrefix();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: comments, isLoading, refetch } = useListVendorComments();
+
+  const [replyTarget, setReplyTarget] = useState<{ orderId: number; orderCode: string; originalComment: string } | null>(null);
+  const [replyText, setReplyText] = useState("");
+
+  const replyMutation = useAddOrderComment({
+    mutation: {
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ["listVendorComments"] });
+        refetch();
+        toast({ title: "Reply sent" });
+        setReplyTarget(null);
+        setReplyText("");
+      },
+      onError: () => toast({ title: "Failed to send reply", variant: "destructive" }),
+    },
+  });
 
   const filtered = (comments ?? []).filter((c) => {
     if (!search) return true;
@@ -75,6 +100,7 @@ export default function VendorComments() {
                   <TableHead className="font-semibold text-foreground">Order</TableHead>
                   <TableHead className="font-semibold text-foreground">Comment</TableHead>
                   <TableHead className="font-semibold text-foreground">Added on</TableHead>
+                  <TableHead className="w-16 text-right pr-4 font-semibold text-foreground">Reply</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -82,7 +108,7 @@ export default function VendorComments() {
                   <TableRow key={c.id} className="hover:bg-muted/30">
                     <TableCell className="pl-4 text-muted-foreground">{i + 1}</TableCell>
                     <TableCell>
-                      <Link href={`/orders/${c.orderId}`}>
+                      <Link href={`${prefix}/orders/${c.orderId}`}>
                         <span className="text-primary font-medium hover:underline cursor-pointer">
                           {c.orderCode}
                         </span>
@@ -94,6 +120,20 @@ export default function VendorComments() {
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(c.addedOn)}
                     </TableCell>
+                    <TableCell className="text-right pr-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                        title="Reply to this comment"
+                        onClick={() => {
+                          setReplyTarget({ orderId: c.orderId, orderCode: c.orderCode, originalComment: c.comment });
+                          setReplyText("");
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -101,6 +141,51 @@ export default function VendorComments() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reply Dialog */}
+      <Dialog open={!!replyTarget} onOpenChange={(open) => { if (!open) { setReplyTarget(null); setReplyText(""); } }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CornerDownRight className="h-5 w-5 text-blue-500" />
+              Reply to Comment
+            </DialogTitle>
+            <DialogDescription>
+              Order <strong>{replyTarget?.orderCode}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <div className="rounded-md bg-muted/50 border px-3 py-2">
+              <p className="text-xs text-muted-foreground font-medium mb-1">Original comment:</p>
+              <p className="text-sm italic">{replyTarget?.originalComment}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reply-text">Your Reply</Label>
+              <Textarea
+                id="reply-text"
+                rows={4}
+                placeholder="Type your reply here..."
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setReplyTarget(null); setReplyText(""); }}>Cancel</Button>
+            <Button
+              disabled={!replyText.trim() || replyMutation.isPending}
+              onClick={() => {
+                if (!replyTarget || !replyText.trim()) return;
+                replyMutation.mutate({ orderId: replyTarget.orderId, data: { content: replyText.trim() } });
+              }}
+            >
+              {replyMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CornerDownRight className="mr-2 h-4 w-4" />}
+              Send Reply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

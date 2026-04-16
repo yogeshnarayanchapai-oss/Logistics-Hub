@@ -48,9 +48,17 @@ function getNavItems(role: string): NavItem[] {
       { name: "Bulk Order", href: "/vendor/orders/bulk", icon: Copy },
       { name: "Stock Inventory", href: "/vendor/stock", icon: Package },
       { name: "Payments", href: "/vendor/payments", icon: Wallet },
-      { name: "Bank Accounts", href: "/vendor/bank-accounts", icon: CreditCard },
+      {
+        name: "Bank Accounts",
+        href: "/vendor/bank-accounts",
+        icon: CreditCard,
+      },
       { name: "My Reports", href: "/vendor/reports", icon: BarChart2 },
-      { name: "Today's Comments", href: "/vendor/comments", icon: MessageSquare },
+      {
+        name: "Today's Comments",
+        href: "/vendor/comments",
+        icon: MessageSquare,
+      },
       { name: "Support Tickets", href: "/vendor/tickets", icon: Ticket },
     ];
   }
@@ -58,7 +66,7 @@ function getNavItems(role: string): NavItem[] {
   if (role === "rider") {
     return [
       { name: "Dashboard", href: "/rider/dashboard", icon: LayoutDashboard },
-      { name: "My Deliveries", href: "/rider/orders", icon: Package },
+      { name: "Orders", href: "/rider/orders", icon: Package },
       { name: "Support Tickets", href: "/rider/tickets", icon: Ticket },
     ];
   }
@@ -75,14 +83,26 @@ function getNavItems(role: string): NavItem[] {
   ];
 
   if (role === "admin" || role === "manager") {
-    items.push({ name: "Stock Inventory", href: "/admin/stock", icon: Package });
+    items.push({
+      name: "Stock Inventory",
+      href: "/admin/stock",
+      icon: Package,
+    });
     items.push({ name: "Payments", href: "/admin/payments", icon: Wallet });
   }
 
   if (role === "admin") {
-    items.push({ name: "Bank Accounts", href: "/admin/bank-accounts", icon: CreditCard });
+    items.push({
+      name: "Bank Accounts",
+      href: "/admin/bank-accounts",
+      icon: CreditCard,
+    });
     items.push({ name: "Users", href: "/admin/users", icon: Users });
-    items.push({ name: "Audit Logs", href: "/admin/audit-logs", icon: Activity });
+    items.push({
+      name: "Audit Logs",
+      href: "/admin/audit-logs",
+      icon: Activity,
+    });
   }
 
   items.push({ name: "Support Tickets", href: "/admin/tickets", icon: Ticket });
@@ -101,23 +121,39 @@ export function Layout({ children }: LayoutProps) {
   if (!user) return <>{children}</>;
 
   const navItems = getNavItems(user.role);
-  const prefix = user.role === "vendor" ? "/vendor" : user.role === "rider" ? "/rider" : "/admin";
+  const prefix =
+    user.role === "vendor"
+      ? "/vendor"
+      : user.role === "rider"
+        ? "/rider"
+        : "/admin";
 
   const initials = user.name
-    ? user.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
+    ? user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
     : "U";
 
-  const currentPageName = navItems.find(
-    (n) => location === n.href || location.startsWith(n.href + "/")
-  )?.name ?? "Dashboard";
+  const currentPageName =
+    navItems.find(
+      (n) => location === n.href || location.startsWith(n.href + "/"),
+    )?.name ?? "Dashboard";
 
   const roleLabel =
-    user.role === "admin" ? "Administrator"
-      : user.role === "manager" ? "Manager"
-      : user.role === "vendor" ? "Vendor"
-      : user.role === "rider" ? "Rider"
-      : user.role === "staff" ? "Staff"
-      : user.role;
+    user.role === "admin"
+      ? "Administrator"
+      : user.role === "manager"
+        ? "Manager"
+        : user.role === "vendor"
+          ? "Vendor"
+          : user.role === "rider"
+            ? "Rider"
+            : user.role === "staff"
+              ? "Staff"
+              : user.role;
 
   return (
     <div className="flex h-screen bg-background">
@@ -125,22 +161,28 @@ export function Layout({ children }: LayoutProps) {
       <div className="hidden md:flex w-64 flex-col fixed inset-y-0 bg-primary z-50 shadow-lg">
         <div className="flex h-16 shrink-0 items-center px-6 border-b border-primary-foreground/20">
           <Truck className="h-8 w-8 text-primary-foreground mr-2" />
-          <span className="text-xl font-bold text-primary-foreground">SwiftShip</span>
+          <span className="text-xl font-bold text-primary-foreground">
+            SwiftShip
+          </span>
         </div>
 
         <div className="flex flex-1 flex-col overflow-y-auto px-4 py-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = location === item.href || location.startsWith(item.href + "/");
+            const isActive =
+              location === item.href || location.startsWith(item.href + "/");
             return (
               <Link key={item.href} href={item.href}>
                 <Button
                   variant="ghost"
                   className={cn(
                     "w-full justify-start text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground",
-                    isActive ? "bg-primary-foreground/20 font-medium" : ""
+                    isActive ? "bg-primary-foreground/20 font-medium" : "",
                   )}
                 >
-                  <item.icon className="mr-3 h-5 w-5 opacity-90" aria-hidden="true" />
+                  <item.icon
+                    className="mr-3 h-5 w-5 opacity-90"
+                    aria-hidden="true"
+                  />
                   {item.name}
                 </Button>
               </Link>
@@ -173,14 +215,22 @@ export function Layout({ children }: LayoutProps) {
           <h1 className="text-lg font-medium">{currentPageName}</h1>
           <div className="flex items-center gap-2">
             <Link href={`${prefix}/notifications`}>
-              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative text-muted-foreground hover:text-foreground"
+              >
                 <Bell className="h-5 w-5" />
               </Button>
             </Link>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-semibold">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-semibold"
+                >
                   {initials}
                 </Button>
               </DropdownMenuTrigger>
@@ -188,7 +238,9 @@ export function Layout({ children }: LayoutProps) {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col gap-0.5">
                     <p className="text-sm font-semibold">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{roleLabel} · {user.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {roleLabel} · {user.email}
+                    </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -220,9 +272,7 @@ export function Layout({ children }: LayoutProps) {
         </header>
 
         <main className="flex-1 overflow-auto p-6 relative">
-          <div className="mx-auto max-w-7xl">
-            {children}
-          </div>
+          <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>
     </div>

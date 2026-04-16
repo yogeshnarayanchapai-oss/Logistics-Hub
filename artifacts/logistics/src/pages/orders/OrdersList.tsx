@@ -403,7 +403,7 @@ export default function OrdersList() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {isRider && (
+                            {isRider ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -413,47 +413,46 @@ export default function OrdersList() {
                               >
                                 <MessageSquare className="h-4 w-4" />
                               </Button>
-                            )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <Link href={`${prefix}/orders/${order.id}`}>
-                                  <DropdownMenuItem className="cursor-pointer">
-                                    <Eye className="mr-2 h-4 w-4" /> View
-                                  </DropdownMenuItem>
-                                </Link>
-                                {canEdit && (
-                                  <Link href={`${prefix}/orders/${order.id}/edit`}>
+                            ) : (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <Link href={`${prefix}/orders/${order.id}`}>
                                     <DropdownMenuItem className="cursor-pointer">
-                                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                                      <Eye className="mr-2 h-4 w-4" /> View
                                     </DropdownMenuItem>
                                   </Link>
-                                )}
-                                {!isRider && (
+                                  {canEdit && (
+                                    <Link href={`${prefix}/orders/${order.id}/edit`}>
+                                      <DropdownMenuItem className="cursor-pointer">
+                                        <Pencil className="mr-2 h-4 w-4" /> Edit
+                                      </DropdownMenuItem>
+                                    </Link>
+                                  )}
                                   <DropdownMenuItem
                                     className="cursor-pointer text-blue-600 focus:text-blue-700 focus:bg-blue-50"
                                     onClick={() => { setCommentTarget({ id: order.id, code: order.orderCode }); setCommentText(""); }}
                                   >
                                     <MessageSquare className="mr-2 h-4 w-4" /> Add Comment
                                   </DropdownMenuItem>
-                                )}
-                                {canDelete && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      className="cursor-pointer text-destructive focus:text-destructive"
-                                      onClick={() => setDeleteTarget({ id: order.id, code: order.orderCode })}
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                  {canDelete && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="cursor-pointer text-destructive focus:text-destructive"
+                                        onClick={() => setDeleteTarget({ id: order.id, code: order.orderCode })}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

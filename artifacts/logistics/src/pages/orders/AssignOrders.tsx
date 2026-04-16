@@ -25,7 +25,7 @@ function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; sta
   const [selectedRider, setSelectedRider] = useState<string>("");
   const { toast } = useToast();
 
-  const { data: riders } = useListRiders(stationId ? { stationId } : {});
+  const { data: riders } = useListRiders({ status: "active" });
 
   const assignMutation = useAssignOrder({
     mutation: {

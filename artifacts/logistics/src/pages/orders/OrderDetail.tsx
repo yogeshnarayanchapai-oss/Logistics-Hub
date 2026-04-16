@@ -77,9 +77,9 @@ export default function OrderDetail() {
     updateStatusMutation.mutate({ id: orderId, data: { status } });
   };
 
-  const { data: riders } = useListRiders({ stationId: orderData?.order.stationId || undefined }, {
+  const { data: riders } = useListRiders({ status: "active" }, {
     query: {
-      enabled: !!orderData?.order.stationId && ["admin", "manager", "station"].includes(user?.role || "")
+      enabled: ["admin", "manager", "station"].includes(user?.role || "")
     }
   });
 

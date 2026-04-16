@@ -60,6 +60,12 @@ router.post("/users", requireAuth, requireRole("admin"), async (req, res): Promi
     return;
   }
 
+  // Validate role-specific required fields BEFORE inserting the user
+  if (role === "vendor" && !vendorCode) {
+    res.status(400).json({ error: "vendorCode is required for vendor users" });
+    return;
+  }
+
   const [user] = await db.insert(usersTable).values({
     name,
     email: email.toLowerCase(),
@@ -90,10 +96,6 @@ router.post("/users", requireAuth, requireRole("admin"), async (req, res): Promi
 
   // Auto-create linked vendor profile
   if (role === "vendor") {
-    if (!vendorCode) {
-      res.status(400).json({ error: "vendorCode is required for vendor users" });
-      return;
-    }
     const [existingVendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.email, email.toLowerCase()));
     if (!existingVendor) {
       const [vendor] = await db.insert(vendorsTable).values({

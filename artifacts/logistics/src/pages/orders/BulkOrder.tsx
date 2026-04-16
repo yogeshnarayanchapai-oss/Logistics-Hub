@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Save, Trash2, Loader2, AlertCircle, Upload, Download, FileSpreadsheet, X } from "lucide-react";
+import { ArrowLeft, Plus, Save, Trash2, Loader2, AlertCircle, Upload, Download, FileSpreadsheet, X, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -61,6 +61,7 @@ export default function BulkOrder() {
   const [rows, setRows] = useState<BulkOrderRow[]>([makeEmptyRow(), makeEmptyRow(), makeEmptyRow()]);
   const [isDragging, setIsDragging] = useState(false);
   const [importedCount, setImportedCount] = useState<number | null>(null);
+  const [importExpanded, setImportExpanded] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: vendors } = useListVendors({}, { query: { enabled: !isVendor } });
@@ -257,24 +258,44 @@ export default function BulkOrder() {
 
       {/* Excel Import Card */}
       <Card>
-        <CardHeader>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setImportExpanded((v) => !v)}
+        >
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
                 Import from Excel
+                {importedCount !== null && (
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-normal text-xs">
+                    {importedCount} rows imported
+                  </Badge>
+                )}
               </CardTitle>
-              <CardDescription>
-                Download our template, fill it in, then upload to auto-populate the order table below.
-              </CardDescription>
+              {importExpanded && (
+                <CardDescription>
+                  Download our template, fill it in, then upload to auto-populate the order table below.
+                </CardDescription>
+              )}
             </div>
-            <Button variant="outline" onClick={downloadSample} className="shrink-0">
-              <Download className="mr-2 h-4 w-4" />
-              Download Sample
-            </Button>
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <Button variant="outline" onClick={downloadSample} className="shrink-0">
+                <Download className="mr-2 h-4 w-4" />
+                Download Sample
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setImportExpanded((v) => !v)}
+                className="shrink-0 text-muted-foreground"
+              >
+                {importExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        {importExpanded && <CardContent>
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
               isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30"
@@ -316,7 +337,7 @@ export default function BulkOrder() {
               <span key={i}><code className="bg-background px-1 rounded">{h}</code>{i < SAMPLE_HEADERS.length - 1 ? ", " : ""}</span>
             ))}
           </div>
-        </CardContent>
+        </CardContent>}
       </Card>
 
       {/* Spreadsheet Table */}

@@ -371,18 +371,18 @@ export default function BulkOrder() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto border rounded-md">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm border-collapse">
               <thead className="bg-muted text-muted-foreground">
                 <tr>
-                  <th className="p-2 font-medium text-left text-xs">#</th>
-                  <th className="p-2 font-medium text-left">Customer Name *</th>
-                  <th className="p-2 font-medium text-left w-32">Phone *</th>
-                  <th className="p-2 font-medium text-left">Product *</th>
-                  <th className="p-2 font-medium text-left w-20">Qty *</th>
-                  <th className="p-2 font-medium text-left w-28">COD (Rs) *</th>
-                  <th className="p-2 font-medium text-left">Address *</th>
-                  <th className="p-2 font-medium text-left w-40">Station</th>
-                  <th className="p-2 font-medium text-center w-12"></th>
+                  <th className="p-2 font-medium text-left text-xs border border-gray-200">#</th>
+                  <th className="p-2 font-medium text-left border border-gray-200">Customer Name *</th>
+                  <th className="p-2 font-medium text-left w-32 border border-gray-200">Phone *</th>
+                  <th className="p-2 font-medium text-left border border-gray-200">Product *</th>
+                  <th className="p-2 font-medium text-left w-20 border border-gray-200">Qty *</th>
+                  <th className="p-2 font-medium text-left w-28 border border-gray-200">COD (Rs) *</th>
+                  <th className="p-2 font-medium text-left border border-gray-200">Address *</th>
+                  <th className="p-2 font-medium text-left w-40 border border-gray-200">Station</th>
+                  <th className="p-2 font-medium text-center w-12 border border-gray-200"></th>
                 </tr>
               </thead>
               <tbody>
@@ -392,29 +392,29 @@ export default function BulkOrder() {
                   const rowHasError = Object.keys(errors).length > 0;
 
                   return (
-                    <tr key={row.id} className={`border-t ${rowHasError && isRowFilled ? "bg-red-50/40" : ""}`}>
-                      <td className="p-1 pl-2 text-xs text-muted-foreground w-6">{index + 1}</td>
-                      <td className="p-1">
+                    <tr key={row.id} className={rowHasError && isRowFilled ? "bg-red-50/40" : ""}>
+                      <td className="p-1 pl-2 text-xs text-muted-foreground w-6 border border-gray-200">{index + 1}</td>
+                      <td className="p-1 border border-gray-200">
                         <CellInput value={row.customerName} onChange={(v) => updateRow(row.id, "customerName", v)} error={errors.customerName} />
                       </td>
-                      <td className="p-1">
+                      <td className="p-1 border border-gray-200">
                         <CellInput value={row.customerPhone} onChange={(v) => updateRow(row.id, "customerPhone", v)} error={errors.customerPhone} />
                       </td>
-                      <td className="p-1">
+                      <td className="p-1 border border-gray-200">
                         <CellInput value={row.productName} onChange={(v) => updateRow(row.id, "productName", v)} error={errors.productName} />
                       </td>
-                      <td className="p-1">
+                      <td className="p-1 border border-gray-200">
                         <CellInput type="number" value={row.quantity} onChange={(v) => updateRow(row.id, "quantity", v === "" ? "" : Number(v))} error={errors.quantity} />
                       </td>
-                      <td className="p-1">
+                      <td className="p-1 border border-gray-200">
                         <CellInput type="number" value={row.codAmount} onChange={(v) => updateRow(row.id, "codAmount", v === "" ? "" : Number(v))} error={errors.codAmount} />
                       </td>
-                      <td className="p-1">
+                      <td className="p-1 border border-gray-200">
                         <CellInput value={row.address} onChange={(v) => updateRow(row.id, "address", v)} error={errors.address} />
                       </td>
-                      <td className="p-1">
+                      <td className="p-1 border border-gray-200">
                         <select
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          className="flex h-9 w-full rounded-md border-0 bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           value={row.stationId?.toString() || ""}
                           onChange={(e) => updateRow(row.id, "stationId", e.target.value ? Number(e.target.value) : "")}
                         >
@@ -424,7 +424,7 @@ export default function BulkOrder() {
                           ))}
                         </select>
                       </td>
-                      <td className="p-1 text-center">
+                      <td className="p-1 text-center border border-gray-200">
                         <Button variant="ghost" size="icon" onClick={() => removeRow(row.id)} disabled={rows.length === 1} className="h-8 w-8 text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-4 w-4" />
                         </Button>

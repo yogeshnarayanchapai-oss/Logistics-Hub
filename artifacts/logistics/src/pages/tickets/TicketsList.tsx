@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 export default function TicketsList() {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("open");
   
   const { data: tickets, isLoading } = useListTickets({ 
     search: search || undefined,

@@ -11,3 +11,4 @@ export * from "./payment_requests";
 export * from "./tickets";
 export * from "./notifications";
 export * from "./audit_logs";
+export * from "./support_contacts";

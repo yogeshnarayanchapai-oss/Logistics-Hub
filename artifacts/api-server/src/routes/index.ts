@@ -12,6 +12,7 @@ import ticketsRouter from "./tickets";
 import notificationsRouter from "./notifications";
 import auditRouter from "./audit";
 import dashboardRouter from "./dashboard";
+import supportContactsRouter from "./support_contacts";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(ticketsRouter);
 router.use(notificationsRouter);
 router.use(auditRouter);
 router.use(dashboardRouter);
+router.use(supportContactsRouter);
 
 export default router;

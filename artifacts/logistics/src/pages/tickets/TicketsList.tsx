@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useListTickets, useCreateTicket, getListTicketsQueryKey } from "@workspace/api-client-react";
+import { useListTickets, useCreateTicket, getListTicketsQueryKey, useListSupportContacts } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Ticket as TicketIcon } from "lucide-react";
+import { Loader2, Plus, Search, Ticket as TicketIcon, Phone, User2, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -30,6 +30,11 @@ export default function TicketsList() {
   const { data: tickets, isLoading } = useListTickets({ 
     search: search || undefined,
     status: statusFilter !== "all" ? statusFilter : undefined
+  });
+
+  const isRiderOrVendor = ["rider", "vendor"].includes(user?.role || "");
+  const { data: contacts } = useListSupportContacts({
+    query: { enabled: isRiderOrVendor }
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -84,6 +89,37 @@ export default function TicketsList() {
         </div>
         <Button onClick={() => setIsDialogOpen(true)}><Plus className="mr-2 h-4 w-4" /> New Ticket</Button>
       </div>
+
+      {isRiderOrVendor && contacts && contacts.length > 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-primary">
+              <Phone className="h-4 w-4" /> Contact Us for Help
+            </CardTitle>
+            <CardDescription>Reach out directly to our support team.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {contacts.map((contact) => (
+                <div key={contact.id} className="flex items-start gap-3 rounded-lg border bg-card p-3 shadow-sm">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <User2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate">{contact.name}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Building2 className="h-3 w-3 shrink-0" /> {contact.department}
+                    </p>
+                    <a href={`tel:${contact.phone}`} className="text-xs text-primary font-medium flex items-center gap-1 mt-1 hover:underline">
+                      <Phone className="h-3 w-3 shrink-0" /> {contact.phone}
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

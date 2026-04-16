@@ -101,6 +101,12 @@ router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res): 
 
   const [user] = await db.update(usersTable).set(updates as any).where(eq(usersTable.id, id)).returning();
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  if (status) {
+    await db.update(vendorsTable).set({ status }).where(eq(vendorsTable.userId, id));
+    await db.update(ridersTable).set({ status }).where(eq(ridersTable.userId, id));
+  }
+
   await createAuditLog({ userId, action: "update", entity: "user", entityId: id, description: `Updated user ${user.name}` });
   res.json(await formatUser(user));
 });
@@ -109,9 +115,12 @@ router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res):
   const userId = (req as any).userId as number;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  const [user] = await db.delete(usersTable).where(eq(usersTable.id, id)).returning();
-  if (!user) { res.status(404).json({ error: "User not found" }); return; }
-  await createAuditLog({ userId, action: "delete", entity: "user", entityId: id, description: `Deleted user ${user.name}` });
+  const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+  if (!existing) { res.status(404).json({ error: "User not found" }); return; }
+  await db.delete(vendorsTable).where(eq(vendorsTable.userId, id));
+  await db.delete(ridersTable).where(eq(ridersTable.userId, id));
+  await db.delete(usersTable).where(eq(usersTable.id, id));
+  await createAuditLog({ userId, action: "delete", entity: "user", entityId: id, description: `Deleted user ${existing.name}` });
   res.sendStatus(204);
 });
 

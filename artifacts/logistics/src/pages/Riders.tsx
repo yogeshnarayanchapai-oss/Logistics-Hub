@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListRiders, useCreateRider, useUpdateRider, useDeleteRider, useListStations, getListRidersQueryKey } from "@workspace/api-client-react";
+import { useListRiders, useCreateRider, useUpdateRider, useListStations, getListRidersQueryKey, getListUsersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -8,17 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Truck, Pencil, Trash2, ToggleLeft, ToggleRight, MoreHorizontal } from "lucide-react";
+import { Loader2, Plus, Search, Truck, Pencil, ToggleLeft, ToggleRight, MoreHorizontal } from "lucide-react";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -36,12 +31,13 @@ export default function Riders() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRider, setEditingRider] = useState<any>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
-
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListRidersQueryKey() });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: getListRidersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+  };
 
   const createMutation = useCreateRider({
     mutation: {
@@ -52,13 +48,6 @@ export default function Riders() {
   const updateMutation = useUpdateRider({
     mutation: {
       onSuccess: () => { invalidate(); toast({ title: "Rider updated successfully" }); setIsDialogOpen(false); }
-    }
-  });
-
-  const deleteMutation = useDeleteRider({
-    mutation: {
-      onSuccess: () => { invalidate(); toast({ title: "Rider deleted" }); setDeleteTarget(null); },
-      onError: () => { toast({ title: "Delete failed", variant: "destructive" }); setDeleteTarget(null); }
     }
   });
 
@@ -202,17 +191,6 @@ export default function Riders() {
                                     : <><ToggleLeft className="mr-2 h-4 w-4" /> Activate</>}
                                 </DropdownMenuItem>
                               )}
-                              {isAdmin && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="cursor-pointer text-destructive focus:text-destructive"
-                                    onClick={() => setDeleteTarget({ id: rider.id, name: rider.name })}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                  </DropdownMenuItem>
-                                </>
-                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -297,27 +275,6 @@ export default function Riders() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Rider</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

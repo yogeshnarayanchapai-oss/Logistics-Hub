@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
-  useListVendors, useCreateVendor, useUpdateVendor, useDeleteVendor, getListVendorsQueryKey,
+  useListVendors, useCreateVendor, useUpdateVendor, getListVendorsQueryKey,
   useListBankAccounts, useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount,
-  getListBankAccountsQueryKey,
+  getListBankAccountsQueryKey, getListUsersQueryKey,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Search, Store, Pencil, Trash2, ToggleLeft, ToggleRight, Building, Wallet, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -254,13 +254,15 @@ export default function Vendors() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<any>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [bankVendor, setBankVendor] = useState<any>(null);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+  };
 
   const createMutation = useCreateVendor({
     mutation: {
@@ -271,13 +273,6 @@ export default function Vendors() {
   const updateMutation = useUpdateVendor({
     mutation: {
       onSuccess: () => { invalidate(); toast({ title: "Vendor updated successfully" }); setIsDialogOpen(false); }
-    }
-  });
-
-  const deleteMutation = useDeleteVendor({
-    mutation: {
-      onSuccess: () => { invalidate(); toast({ title: "Vendor deleted" }); setDeleteTarget(null); },
-      onError: () => { toast({ title: "Delete failed", variant: "destructive" }); setDeleteTarget(null); }
     }
   });
 
@@ -425,17 +420,6 @@ export default function Vendors() {
                                     : <><ToggleLeft className="mr-2 h-4 w-4" /> Activate</>}
                                 </DropdownMenuItem>
                               )}
-                              {isAdmin && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="cursor-pointer text-destructive focus:text-destructive"
-                                    onClick={() => setDeleteTarget({ id: vendor.id, name: vendor.name })}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                  </DropdownMenuItem>
-                                </>
-                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -525,27 +509,6 @@ export default function Vendors() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

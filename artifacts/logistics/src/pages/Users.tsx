@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListUsers, useCreateUser, useUpdateUser, useDeleteUser, getListUsersQueryKey } from "@workspace/api-client-react";
+import { useListUsers, useCreateUser, useUpdateUser, useDeleteUser, getListUsersQueryKey, getListVendorsQueryKey, getListRidersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,11 @@ export default function Users() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListRidersQueryKey() });
+  };
 
   const createMutation = useCreateUser({
     mutation: {

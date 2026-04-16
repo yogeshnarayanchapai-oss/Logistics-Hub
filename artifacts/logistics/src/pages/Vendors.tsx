@@ -1,42 +1,59 @@
 import { useState } from "react";
-import { useListVendors, useCreateVendor, useUpdateVendor, getListVendorsQueryKey } from "@workspace/api-client-react";
+import { useListVendors, useCreateVendor, useUpdateVendor, useDeleteVendor, getListVendorsQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Store } from "lucide-react";
+import { Loader2, Plus, Search, Store, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
 export default function Vendors() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
-  const { data: vendors, isLoading } = useListVendors({ search: search || undefined });
+  const [statusFilter, setStatusFilter] = useState<string>("active");
+
+  const { data: vendors, isLoading } = useListVendors({
+    search: search || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+  });
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<any>(null);
-  
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
+
   const createMutation = useCreateVendor({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
-        toast({ title: "Vendor created successfully" });
-        setIsDialogOpen(false);
-      }
+      onSuccess: () => { invalidate(); toast({ title: "Vendor created successfully" }); setIsDialogOpen(false); }
     }
   });
 
   const updateMutation = useUpdateVendor({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
-        toast({ title: "Vendor updated successfully" });
-        setIsDialogOpen(false);
-      }
+      onSuccess: () => { invalidate(); toast({ title: "Vendor updated successfully" }); setIsDialogOpen(false); }
+    }
+  });
+
+  const deleteMutation = useDeleteVendor({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Vendor deleted" }); setDeleteTarget(null); },
+      onError: () => { toast({ title: "Delete failed", variant: "destructive" }); setDeleteTarget(null); }
     }
   });
 
@@ -53,7 +70,6 @@ export default function Vendors() {
       deliveryCharge: Number(formData.get("deliveryCharge")),
       status: formData.get("status") as string || "active"
     };
-
     if (editingVendor) {
       updateMutation.mutate({ id: editingVendor.id, data });
     } else {
@@ -61,15 +77,21 @@ export default function Vendors() {
     }
   };
 
-  const openNewDialog = () => {
-    setEditingVendor(null);
-    setIsDialogOpen(true);
+  const toggleStatus = (vendor: any) => {
+    const newStatus = vendor.status === "active" ? "inactive" : "active";
+    updateMutation.mutate(
+      { id: vendor.id, data: { status: newStatus } },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: `Vendor ${newStatus === "active" ? "activated" : "deactivated"}` });
+        }
+      }
+    );
   };
 
-  const openEditDialog = (vendor: any) => {
-    setEditingVendor(vendor);
-    setIsDialogOpen(true);
-  };
+  const isAdmin = user?.role === "admin";
+  const canManage = ["admin", "manager"].includes(user?.role || "");
 
   return (
     <div className="space-y-6">
@@ -78,21 +100,38 @@ export default function Vendors() {
           <h2 className="text-2xl font-bold tracking-tight">Vendors</h2>
           <p className="text-muted-foreground">Manage merchants and clients.</p>
         </div>
-        <Button onClick={openNewDialog}><Plus className="mr-2 h-4 w-4" /> Add Vendor</Button>
+        {canManage && (
+          <Button onClick={() => { setEditingVendor(null); setIsDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" /> Add Vendor
+          </Button>
+        )}
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex w-full md:w-1/3 items-center space-x-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search vendors..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full"
-            />
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                placeholder="Search vendors..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
+
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -110,13 +149,13 @@ export default function Vendors() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vendors?.length === 0 ? (
+                  {!vendors?.length ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No vendors found.</TableCell>
                     </TableRow>
                   ) : (
-                    vendors?.map((vendor) => (
-                      <TableRow key={vendor.id}>
+                    vendors.map((vendor) => (
+                      <TableRow key={vendor.id} className={vendor.status === "inactive" ? "opacity-60" : ""}>
                         <TableCell className="font-medium">{vendor.vendorCode}</TableCell>
                         <TableCell>
                           <div className="font-medium flex items-center gap-2">
@@ -131,10 +170,39 @@ export default function Vendors() {
                         </TableCell>
                         <TableCell>Rs. {vendor.deliveryCharge}</TableCell>
                         <TableCell>
-                          <Badge variant={vendor.status === 'active' ? 'default' : 'secondary'}>{vendor.status}</Badge>
+                          <Badge variant={vendor.status === "active" ? "default" : "secondary"}>
+                            {vendor.status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(vendor)}>Edit</Button>
+                          <div className="flex items-center justify-end gap-1">
+                            {canManage && (
+                              <Button variant="ghost" size="sm" onClick={() => { setEditingVendor(vendor); setIsDialogOpen(true); }}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                              </Button>
+                            )}
+                            {canManage && (
+                              <Button
+                                variant="ghost" size="sm"
+                                className={vendor.status === "active" ? "text-orange-600 hover:text-orange-700" : "text-green-600 hover:text-green-700"}
+                                onClick={() => toggleStatus(vendor)}
+                                disabled={updateMutation.isPending}
+                              >
+                                {vendor.status === "active"
+                                  ? <><ToggleRight className="h-3.5 w-3.5 mr-1" /> Deactivate</>
+                                  : <><ToggleLeft className="h-3.5 w-3.5 mr-1" /> Activate</>}
+                              </Button>
+                            )}
+                            {isAdmin && (
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget({ id: vendor.id, name: vendor.name })}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -146,6 +214,7 @@ export default function Vendors() {
         </CardContent>
       </Card>
 
+      {/* Edit / Create Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <form onSubmit={handleSave}>
@@ -186,16 +255,14 @@ export default function Vendors() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="deliveryCharge">Base Delivery Charge (Rs.) *</Label>
+                  <Label htmlFor="deliveryCharge">Delivery Charge (Rs.) *</Label>
                   <Input id="deliveryCharge" name="deliveryCharge" type="number" defaultValue={editingVendor?.deliveryCharge || 100} required />
                 </div>
                 {editingVendor && (
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
-                    <select 
-                      id="status" 
-                      name="status" 
-                      defaultValue={editingVendor.status}
+                    <select
+                      id="status" name="status" defaultValue={editingVendor.status}
                       className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
                       <option value="active">Active</option>
@@ -208,13 +275,35 @@ export default function Vendors() {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

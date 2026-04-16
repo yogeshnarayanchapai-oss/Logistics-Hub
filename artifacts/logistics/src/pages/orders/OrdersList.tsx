@@ -1,4 +1,4 @@
-import { useListOrders, useDeleteOrder, useAssignOrder, useListRiders, getListOrdersQueryKey } from "@workspace/api-client-react";
+import { useListOrders, useDeleteOrder, useAssignOrder, useListRiders, useAddOrderComment, getListOrdersQueryKey, getListOrderCommentsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useState, useRef, useMemo } from "react";
@@ -22,7 +22,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Loader2, Plus, Search, X, Pencil, Trash2, MoreHorizontal, Eye, UserCheck } from "lucide-react";
+import { Loader2, Plus, Search, X, Pencil, Trash2, MoreHorizontal, Eye, UserCheck, MessageSquare } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -67,6 +69,21 @@ export default function OrdersList() {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; code: string } | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Quick comment (rider)
+  const [commentTarget, setCommentTarget] = useState<{ id: number; code: string } | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const commentMutation = useAddOrderComment({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListOrderCommentsQueryKey(commentTarget?.id ?? 0) });
+        toast({ title: "Comment added" });
+        setCommentTarget(null);
+        setCommentText("");
+      },
+      onError: () => toast({ title: "Failed to add comment", variant: "destructive" }),
+    },
+  });
 
   // Quick reassign
   const [reassignTarget, setReassignTarget] = useState<{ id: number; code: string; riderName?: string | null } | null>(null);
@@ -344,7 +361,7 @@ export default function OrdersList() {
                           </TableCell>
                         )}
                         <TableCell className="font-medium">
-                          <Link href={`/orders/${order.id}`} className="text-primary hover:underline">
+                          <Link href={`${prefix}/orders/${order.id}`} className="text-primary hover:underline">
                             {order.orderCode}
                           </Link>
                           {order.duplicateFlag && (
@@ -385,38 +402,59 @@ export default function OrdersList() {
                             : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                <MoreHorizontal className="h-4 w-4" />
+                          <div className="flex items-center justify-end gap-1">
+                            {isRider && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                title="Add comment"
+                                onClick={() => { setCommentTarget({ id: order.id, code: order.orderCode }); setCommentText(""); }}
+                              >
+                                <MessageSquare className="h-4 w-4" />
                               </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <Link href={`/orders/${order.id}`}>
-                                <DropdownMenuItem className="cursor-pointer">
-                                  <Eye className="mr-2 h-4 w-4" /> View
-                                </DropdownMenuItem>
-                              </Link>
-                              {canEdit && (
-                                <Link href={`/orders/${order.id}/edit`}>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <Link href={`${prefix}/orders/${order.id}`}>
                                   <DropdownMenuItem className="cursor-pointer">
-                                    <Pencil className="mr-2 h-4 w-4" /> Edit
+                                    <Eye className="mr-2 h-4 w-4" /> View
                                   </DropdownMenuItem>
                                 </Link>
-                              )}
-                              {canDelete && (
-                                <>
-                                  <DropdownMenuSeparator />
+                                {canEdit && (
+                                  <Link href={`${prefix}/orders/${order.id}/edit`}>
+                                    <DropdownMenuItem className="cursor-pointer">
+                                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                                    </DropdownMenuItem>
+                                  </Link>
+                                )}
+                                {!isRider && (
                                   <DropdownMenuItem
-                                    className="cursor-pointer text-destructive focus:text-destructive"
-                                    onClick={() => setDeleteTarget({ id: order.id, code: order.orderCode })}
+                                    className="cursor-pointer text-blue-600 focus:text-blue-700 focus:bg-blue-50"
+                                    onClick={() => { setCommentTarget({ id: order.id, code: order.orderCode }); setCommentText(""); }}
                                   >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    <MessageSquare className="mr-2 h-4 w-4" /> Add Comment
                                   </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                )}
+                                {canDelete && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="cursor-pointer text-destructive focus:text-destructive"
+                                      onClick={() => setDeleteTarget({ id: order.id, code: order.orderCode })}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -523,6 +561,45 @@ export default function OrdersList() {
             >
               {assignMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
               Reassign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Comment Dialog */}
+      <Dialog open={!!commentTarget} onOpenChange={(open) => { if (!open) { setCommentTarget(null); setCommentText(""); } }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              Add Comment
+            </DialogTitle>
+            <DialogDescription>
+              Order <strong>{commentTarget?.code}</strong> — your comment will be visible to the office team.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3 space-y-2">
+            <Label htmlFor="quick-comment">Comment</Label>
+            <Textarea
+              id="quick-comment"
+              rows={4}
+              placeholder="e.g. Customer was not available, tried 2 times..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCommentTarget(null); setCommentText(""); }}>Cancel</Button>
+            <Button
+              disabled={!commentText.trim() || commentMutation.isPending}
+              onClick={() => {
+                if (!commentTarget || !commentText.trim()) return;
+                commentMutation.mutate({ id: commentTarget.id, data: { message: commentText.trim() } });
+              }}
+            >
+              {commentMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+              Submit Comment
             </Button>
           </DialogFooter>
         </DialogContent>

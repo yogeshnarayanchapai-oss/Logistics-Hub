@@ -1,4 +1,4 @@
-import { useListOrders, useDeleteOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
+import { useListOrders, useDeleteOrder, useAssignOrder, useListRiders, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useState, useRef, useMemo } from "react";
 import { Link } from "wouter";
@@ -17,8 +17,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Loader2, Plus, Search, X, Pencil, Trash2, MoreHorizontal, Eye } from "lucide-react";
+import { Loader2, Plus, Search, X, Pencil, Trash2, MoreHorizontal, Eye, UserCheck } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -62,6 +65,22 @@ export default function OrdersList() {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; code: string } | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Quick reassign
+  const [reassignTarget, setReassignTarget] = useState<{ id: number; code: string; riderName?: string | null } | null>(null);
+  const [reassignRiderId, setReassignRiderId] = useState<string>("");
+  const { data: allRiders } = useListRiders({ status: "active" });
+  const assignMutation = useAssignOrder({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Rider reassigned successfully" });
+        setReassignTarget(null);
+        setReassignRiderId("");
+        invalidateOrders();
+      },
+      onError: () => toast({ title: "Reassignment failed", variant: "destructive" }),
+    },
+  });
 
   const isSearchMode = activeSearch.length > 0;
 
@@ -342,7 +361,22 @@ export default function OrdersList() {
                           <div className="text-xs text-muted-foreground">{order.city}</div>
                         </TableCell>
                         <TableCell className="font-medium">Rs. {order.codAmount.toLocaleString()}</TableCell>
-                        <TableCell><StatusBadge status={order.status} /></TableCell>
+                        <TableCell>
+                          {canEdit && order.status === "assigned" ? (
+                            <span
+                              title="Double-click to reassign rider"
+                              onDoubleClick={() => {
+                                setReassignTarget({ id: order.id, code: order.orderCode, riderName: order.riderName });
+                                setReassignRiderId("");
+                              }}
+                              className="cursor-pointer select-none"
+                            >
+                              <StatusBadge status={order.status} className="ring-1 ring-offset-1 ring-primary/30 hover:ring-primary/60 transition-shadow" />
+                            </span>
+                          ) : (
+                            <StatusBadge status={order.status} />
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm">
                           {order.riderName
                             ? <span className="font-medium">{order.riderName}</span>
@@ -441,6 +475,56 @@ export default function OrdersList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Quick Reassign Dialog */}
+      <Dialog open={!!reassignTarget} onOpenChange={(open) => { if (!open) { setReassignTarget(null); setReassignRiderId(""); } }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-primary" />
+              Reassign Rider
+            </DialogTitle>
+            <DialogDescription>
+              Order <strong>{reassignTarget?.code}</strong>
+              {reassignTarget?.riderName && (
+                <> — currently assigned to <strong>{reassignTarget.riderName}</strong></>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={reassignRiderId} onValueChange={setReassignRiderId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a rider..." />
+              </SelectTrigger>
+              <SelectContent>
+                {!allRiders?.length ? (
+                  <SelectItem value="none" disabled>No active riders</SelectItem>
+                ) : (
+                  allRiders.map((r) => (
+                    <SelectItem key={r.id} value={String(r.id)}>
+                      {r.name}
+                      {r.stationName && <span className="text-muted-foreground ml-1">({r.stationName})</span>}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setReassignTarget(null); setReassignRiderId(""); }}>Cancel</Button>
+            <Button
+              disabled={!reassignRiderId || assignMutation.isPending}
+              onClick={() => {
+                if (!reassignTarget || !reassignRiderId) return;
+                assignMutation.mutate({ id: reassignTarget.id, data: { riderId: Number(reassignRiderId) } });
+              }}
+            >
+              {assignMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
+              Reassign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

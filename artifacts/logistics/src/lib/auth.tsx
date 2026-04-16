@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { useGetMe, setAuthTokenGetter } from "@workspace/api-client-react";
 import type { User } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 
 // Ensure custom fetch uses our local storage token
 setAuthTokenGetter(() => localStorage.getItem("authToken"));
@@ -16,8 +18,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem("authToken"));
-  
-  const { data: user, isLoading, refetch } = useGetMe({
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+
+  const { data: user, isLoading } = useGetMe({
     query: {
       enabled: !!token,
       retry: false,
@@ -32,10 +36,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem("authToken");
     setToken(null);
+    queryClient.clear();
+    setLocation("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user: user || null, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user: user ?? null, isLoading: !!token && isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

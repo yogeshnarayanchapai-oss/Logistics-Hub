@@ -4,7 +4,6 @@ import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -15,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Truck, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Loader2, Plus, Search, Truck, Pencil, Trash2, ToggleLeft, ToggleRight, MapPin, Phone, Mail, Car } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
@@ -131,87 +130,102 @@ export default function Riders() {
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : !riders?.length ? (
+            <div className="text-center py-12 text-muted-foreground">No riders found.</div>
           ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Station</TableHead>
-                    <TableHead>Vehicle</TableHead>
-                    <TableHead>Workload</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!riders?.length ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No riders found.</TableCell>
-                    </TableRow>
-                  ) : (
-                    riders.map((rider) => (
-                      <TableRow key={rider.id} className={rider.status === "inactive" ? "opacity-60" : ""}>
-                        <TableCell>
-                          <div className="font-medium flex items-center gap-2">
-                            <Truck className="h-4 w-4 text-muted-foreground" />
-                            {rider.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">{rider.email}</div>
-                          <div className="text-xs text-muted-foreground">{rider.phone}</div>
-                        </TableCell>
-                        <TableCell>{rider.stationName || "—"}</TableCell>
-                        <TableCell>{rider.vehicleNumber || "—"}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2 flex-wrap">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700">{rider.assignedCount} Assigned</Badge>
-                            <Badge variant="outline" className="bg-green-50 text-green-700">{rider.deliveredToday} Today</Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={rider.status === "active" ? "default" : "secondary"}>{rider.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {canManage && (
-                              <Button variant="ghost" size="sm" onClick={() => { setEditingRider(rider); setIsDialogOpen(true); }}>
-                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                              </Button>
-                            )}
-                            {canManage && (
-                              <Button
-                                variant="ghost" size="sm"
-                                className={rider.status === "active" ? "text-orange-600 hover:text-orange-700" : "text-green-600 hover:text-green-700"}
-                                onClick={() => toggleStatus(rider)}
-                                disabled={updateMutation.isPending}
-                              >
-                                {rider.status === "active"
-                                  ? <><ToggleRight className="h-3.5 w-3.5 mr-1" /> Deactivate</>
-                                  : <><ToggleLeft className="h-3.5 w-3.5 mr-1" /> Activate</>}
-                              </Button>
-                            )}
-                            {isAdmin && (
-                              <Button
-                                variant="ghost" size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDeleteTarget({ id: rider.id, name: rider.name })}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+            <div className="divide-y">
+              {riders.map((rider) => (
+                <div
+                  key={rider.id}
+                  className={`flex items-center gap-4 px-6 py-4 hover:bg-muted/40 transition-colors ${rider.status === "inactive" ? "opacity-60" : ""}`}
+                >
+                  {/* Avatar */}
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Truck className="h-5 w-5 text-primary" />
+                  </div>
+
+                  {/* Name + contact */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm">{rider.name}</span>
+                      <Badge
+                        variant={rider.status === "active" ? "default" : "secondary"}
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {rider.status}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Mail className="h-3 w-3" /> {rider.email}
+                      </span>
+                      {rider.phone && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> {rider.phone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Station + Vehicle */}
+                  <div className="hidden md:flex flex-col items-start gap-0.5 min-w-[130px]">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {rider.stationName || "No station"}
+                    </span>
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Car className="h-3 w-3" />
+                      {rider.vehicleNumber || "—"}
+                    </span>
+                  </div>
+
+                  {/* Today's workload */}
+                  <div className="hidden sm:flex flex-col items-center min-w-[80px]">
+                    <span className="text-lg font-bold text-primary leading-none">{rider.deliveredToday}</span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">Today</span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {canManage && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => { setEditingRider(rider); setIsDialogOpen(true); }}
+                      >
+                        <Pencil className="h-3 w-3 mr-1" /> Edit
+                      </Button>
+                    )}
+                    {canManage && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`h-8 px-3 text-xs ${rider.status === "active" ? "text-orange-600 border-orange-200 hover:bg-orange-50" : "text-green-600 border-green-200 hover:bg-green-50"}`}
+                        onClick={() => toggleStatus(rider)}
+                        disabled={updateMutation.isPending}
+                      >
+                        {rider.status === "active"
+                          ? <><ToggleRight className="h-3 w-3 mr-1" /> Deactivate</>
+                          : <><ToggleLeft className="h-3 w-3 mr-1" /> Activate</>}
+                      </Button>
+                    )}
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-red-50"
+                        onClick={() => setDeleteTarget({ id: rider.id, name: rider.name })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

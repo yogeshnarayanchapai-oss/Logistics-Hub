@@ -54,7 +54,7 @@ export function Layout({ children }: LayoutProps) {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <div className="hidden md:flex w-64 flex-col fixed inset-y-0 bg-primary z-50 shadow-lg">
         <div className="flex h-16 shrink-0 items-center px-6 border-b border-primary-foreground/20">
@@ -101,7 +101,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Main content */}
       <div className="flex flex-1 flex-col md:pl-64">
         {/* Top Header */}
-        <header className="flex h-16 items-center justify-between border-b bg-white dark:bg-gray-800 px-6 shadow-sm z-10">
+        <header className="flex h-16 items-center justify-between border-b bg-card px-6 shadow-sm z-10">
           <h1 className="text-lg font-medium">
             {filteredNavigation.find(n => location === n.href || location.startsWith(n.href + '/'))?.name || 'Dashboard'}
           </h1>

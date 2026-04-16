@@ -160,7 +160,7 @@ export default function TicketDetail() {
                       <span className="text-[10px] text-muted-foreground capitalize">{msg.userRole}</span>
                       <span className="text-[10px] text-muted-foreground">{format(new Date(msg.createdAt), "h:mm a")}</span>
                     </div>
-                    <div className={`p-3 rounded-lg text-sm ${isCurrentUser ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-muted rounded-tl-none'}`}>
+                    <div className={`p-3 rounded-lg text-sm ${isCurrentUser ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-muted text-foreground rounded-tl-none'}`}>
                       <div className="whitespace-pre-wrap">{msg.message}</div>
                     </div>
                   </div>

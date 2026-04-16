@@ -66,9 +66,12 @@ export default function OrdersList() {
     [isSearchMode, datePreset, customFrom, customTo]
   );
 
+  const isRider = user?.role === "rider";
+
   const queryParams = {
     search: activeSearch || undefined,
     status: (!isSearchMode && statusFilter !== "all") ? statusFilter : undefined,
+    riderId: isRider && user?.riderId ? user.riderId : undefined,
     dateFrom,
     dateTo,
     page,
@@ -141,8 +144,10 @@ export default function OrdersList() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Orders</h2>
-          <p className="text-muted-foreground">Manage and track all deliveries.</p>
+          <h2 className="text-2xl font-bold tracking-tight">{isRider ? "My Deliveries" : "Orders"}</h2>
+          <p className="text-muted-foreground">
+            {isRider ? "Orders assigned to you for delivery." : "Manage and track all deliveries."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {["admin", "manager", "vendor"].includes(user?.role || "") && (

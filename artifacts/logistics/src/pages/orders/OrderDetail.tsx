@@ -106,6 +106,27 @@ export default function OrderDetail() {
 
   const { order, statusHistory } = orderData;
 
+  const isRider = user?.role === "rider";
+
+  if (isRider && order.riderId !== user?.riderId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
+        <div className="h-14 w-14 rounded-full bg-red-100 flex items-center justify-center">
+          <AlertTriangle className="h-7 w-7 text-red-500" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-lg">Order Not Assigned to You</h3>
+          <p className="text-sm text-muted-foreground mt-1">You can only view and update orders assigned to you.</p>
+        </div>
+        <Link href="/orders">
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Deliveries
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
@@ -131,38 +152,54 @@ export default function OrderDetail() {
         </div>
 
         <div className="flex items-center gap-2">
-          {["admin", "manager"].includes(user?.role || "") && (
-            <Select onValueChange={handleStatusUpdate} defaultValue={order.status}>
-              <SelectTrigger className="w-[180px]">
+          {isRider ? (
+            <Select onValueChange={handleStatusUpdate} value={order.status}>
+              <SelectTrigger className="w-[190px]">
                 <SelectValue placeholder="Update Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="under_review">Under Review</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="picked_for_delivery">Picked Up</SelectItem>
-                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                <SelectItem value="picked_up">Picked Up</SelectItem>
+                <SelectItem value="in_transit">In Transit</SelectItem>
                 <SelectItem value="delivered">Delivered</SelectItem>
                 <SelectItem value="failed_delivery">Failed Delivery</SelectItem>
-                <SelectItem value="reschedule">Reschedule</SelectItem>
-                <SelectItem value="return_pending">Return Pending</SelectItem>
-                <SelectItem value="returned">Returned</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-          )}
+          ) : (
+            <>
+              {["admin", "manager"].includes(user?.role || "") && (
+                <Select onValueChange={handleStatusUpdate} defaultValue={order.status}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Update Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">New</SelectItem>
+                    <SelectItem value="under_review">Under Review</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="picked_for_delivery">Picked Up</SelectItem>
+                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="failed_delivery">Failed Delivery</SelectItem>
+                    <SelectItem value="reschedule">Reschedule</SelectItem>
+                    <SelectItem value="return_pending">Return Pending</SelectItem>
+                    <SelectItem value="returned">Returned</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
 
-          {["admin", "manager", "station"].includes(user?.role || "") && (
-            <Select onValueChange={handleAssignRider} value={order.riderId?.toString() || ""}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Assign Rider" />
-              </SelectTrigger>
-              <SelectContent>
-                {riders?.map(r => (
-                  <SelectItem key={r.id} value={r.id.toString()}>{r.name} ({r.assignedCount} assigned)</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {["admin", "manager", "station"].includes(user?.role || "") && (
+                <Select onValueChange={handleAssignRider} value={order.riderId?.toString() || ""}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Assign Rider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {riders?.map(r => (
+                      <SelectItem key={r.id} value={r.id.toString()}>{r.name} ({r.assignedCount} assigned)</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
           )}
         </div>
       </div>

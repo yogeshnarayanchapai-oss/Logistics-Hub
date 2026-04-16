@@ -1,6 +1,6 @@
 import { useListOrders } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { format, subDays, startOfDay } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -58,9 +58,10 @@ export default function OrdersList() {
   // When search is active, bypass all filters
   const isSearchMode = activeSearch.length > 0;
 
-  const { dateFrom, dateTo } = isSearchMode
-    ? { dateFrom: undefined, dateTo: undefined }
-    : getDateRange(datePreset, customFrom, customTo);
+  const { dateFrom, dateTo } = useMemo(
+    () => isSearchMode ? { dateFrom: undefined, dateTo: undefined } : getDateRange(datePreset, customFrom, customTo),
+    [isSearchMode, datePreset, customFrom, customTo]
+  );
 
   const { data, isLoading } = useListOrders({
     search: activeSearch || undefined,

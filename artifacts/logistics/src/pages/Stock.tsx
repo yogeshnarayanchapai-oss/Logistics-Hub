@@ -1,5 +1,5 @@
 import { useAuth } from "@/lib/auth";
-import { useListStock, useUpdateStockEntry, useDeleteStockEntry, getListStockQueryKey } from "@workspace/api-client-react";
+import { useListStock, useCreateStockEntry, useUpdateStockEntry, useDeleteStockEntry, useListVendors, getListStockQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, Package, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import { Loader2, Search, Package, Plus, Trash2, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -23,18 +23,24 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
+type DialogMode = "add-product" | "stock-in" | "stock-out" | null;
+
 export default function Stock() {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState<string>("all");
   const isVendor = user?.role === "vendor";
   const isAdmin = user?.role === "admin";
+  const isManager = user?.role === "manager";
+  const canManage = isAdmin || isManager || isVendor;
   const vendorId = isVendor && user?.vendorId ? user.vendorId : undefined;
 
   const { data: rawEntries, isLoading } = useListStock({
     search: search || undefined,
     vendorId,
   });
+
+  const { data: vendors } = useListVendors({ status: "active" });
 
   const stockEntries = useMemo(() => {
     if (!rawEntries) return [];
@@ -44,8 +50,8 @@ export default function Stock() {
     return rawEntries.filter((e) => e.currentStock >= 0);
   }, [rawEntries, stockFilter]);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingStock, setEditingStock] = useState<any>(null);
+  const [dialogMode, setDialogMode] = useState<DialogMode>(null);
+  const [activeEntry, setActiveEntry] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const queryClient = useQueryClient();
@@ -53,9 +59,15 @@ export default function Stock() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListStockQueryKey() });
 
+  const createMutation = useCreateStockEntry({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Product added to inventory" }); setDialogMode(null); }
+    }
+  });
+
   const updateMutation = useUpdateStockEntry({
     mutation: {
-      onSuccess: () => { invalidate(); toast({ title: "Stock updated successfully" }); setIsDialogOpen(false); }
+      onSuccess: () => { invalidate(); toast({ title: "Stock updated successfully" }); setDialogMode(null); }
     }
   });
 
@@ -66,24 +78,43 @@ export default function Stock() {
     }
   });
 
-  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const data = {
-      receivedStock: Number(formData.get("receivedStock")),
-      damagedStock: Number(formData.get("damagedStock")),
-      note: formData.get("note") as string || null
-    };
-    updateMutation.mutate({ id: editingStock.id, data });
+    const fd = new FormData(e.currentTarget);
+    createMutation.mutate({
+      data: {
+        vendorId: isVendor ? (user?.vendorId ?? 0) : Number(fd.get("vendorId")),
+        productName: fd.get("productName") as string,
+        productSku: fd.get("productSku") as string || null,
+        openingStock: Number(fd.get("openingStock")) || 0,
+      }
+    });
+  };
+
+  const handleStockMovement = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const qty = Number(fd.get("qty"));
+    if (!qty || qty <= 0) {
+      toast({ title: "Enter a valid quantity", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({
+      id: activeEntry.id,
+      data: {
+        type: dialogMode === "stock-in" ? "in" : "out",
+        qty,
+      }
+    });
   };
 
   const getStockLevel = (current: number) => {
-    if (current <= 0) return { label: "Out", class: "bg-red-100 text-red-700" };
-    if (current <= 10) return { label: "Low", class: "bg-orange-100 text-orange-700" };
-    return { label: "OK", class: "bg-green-100 text-green-700" };
+    if (current <= 0) return { label: "Out of Stock", class: "bg-red-100 text-red-700" };
+    if (current <= 10) return { label: "Low Stock", class: "bg-orange-100 text-orange-700" };
+    return { label: "In Stock", class: "bg-green-100 text-green-700" };
   };
 
-  const colSpan = isVendor ? 7 : 9;
+  const colSpan = isVendor ? 7 : 8;
 
   return (
     <div className="space-y-6">
@@ -92,6 +123,11 @@ export default function Stock() {
           <h2 className="text-2xl font-bold tracking-tight">Stock Inventory</h2>
           <p className="text-muted-foreground">Monitor inventory levels by vendor and product.</p>
         </div>
+        {canManage && (
+          <Button onClick={() => { setActiveEntry(null); setDialogMode("add-product"); }}>
+            <Plus className="mr-2 h-4 w-4" /> Add Product
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -107,7 +143,7 @@ export default function Stock() {
               />
             </div>
             <Select value={stockFilter} onValueChange={setStockFilter}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Stock level" />
               </SelectTrigger>
               <SelectContent>
@@ -131,18 +167,26 @@ export default function Stock() {
                     <TableHead>Product</TableHead>
                     {!isVendor && <TableHead>Vendor</TableHead>}
                     <TableHead className="text-right">Opening</TableHead>
-                    <TableHead className="text-right">Received</TableHead>
-                    <TableHead className="text-right">Delivered</TableHead>
-                    <TableHead className="text-right">Returned</TableHead>
-                    <TableHead className="text-right">Damaged</TableHead>
+                    <TableHead className="text-right text-blue-600">In (+)</TableHead>
+                    <TableHead className="text-right text-green-600">Delivered (−)</TableHead>
+                    <TableHead className="text-right text-orange-600">Returned (+)</TableHead>
+                    <TableHead className="text-right text-red-600">Out/Dmg (−)</TableHead>
                     <TableHead className="text-right font-bold text-primary">Current</TableHead>
-                    {!isVendor && <TableHead className="text-right">Actions</TableHead>}
+                    {canManage && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {!stockEntries.length ? (
                     <TableRow>
-                      <TableCell colSpan={colSpan} className="text-center py-8 text-muted-foreground">No inventory records found.</TableCell>
+                      <TableCell colSpan={colSpan} className="text-center py-10 text-muted-foreground">
+                        <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>No inventory records found.</p>
+                        {canManage && (
+                          <Button variant="outline" size="sm" className="mt-3" onClick={() => { setActiveEntry(null); setDialogMode("add-product"); }}>
+                            <Plus className="mr-2 h-3.5 w-3.5" /> Add First Product
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ) : (
                     stockEntries.map((entry) => {
@@ -151,22 +195,22 @@ export default function Stock() {
                         <TableRow key={entry.id}>
                           <TableCell>
                             <div className="font-medium flex items-center gap-2">
-                              <Package className="h-4 w-4 text-muted-foreground" />
+                              <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                               {entry.productName}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
-                              {entry.productSku && <span className="text-xs text-muted-foreground">SKU: {entry.productSku}</span>}
+                              {entry.productSku && <span className="text-xs text-muted-foreground font-mono">SKU: {entry.productSku}</span>}
                               <Badge variant="outline" className={`text-xs px-1.5 py-0 ${level.class}`}>{level.label}</Badge>
                             </div>
                           </TableCell>
-                          {!isVendor && <TableCell>{entry.vendorName}</TableCell>}
+                          {!isVendor && <TableCell className="text-sm">{entry.vendorName}</TableCell>}
                           <TableCell className="text-right text-muted-foreground">{entry.openingStock}</TableCell>
-                          <TableCell className="text-right text-blue-600">+{entry.receivedStock}</TableCell>
-                          <TableCell className="text-right text-green-600">-{entry.deliveredStock}</TableCell>
+                          <TableCell className="text-right text-blue-600 font-medium">+{entry.receivedStock}</TableCell>
+                          <TableCell className="text-right text-green-600">−{entry.deliveredStock}</TableCell>
                           <TableCell className="text-right text-orange-600">+{entry.returnedStock}</TableCell>
-                          <TableCell className="text-right text-red-600">-{entry.damagedStock}</TableCell>
-                          <TableCell className="text-right font-bold text-primary">{entry.currentStock}</TableCell>
-                          {!isVendor && (
+                          <TableCell className="text-right text-red-600 font-medium">−{entry.damagedStock}</TableCell>
+                          <TableCell className="text-right font-bold text-lg text-primary">{entry.currentStock}</TableCell>
+                          {canManage && (
                             <TableCell className="text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -175,8 +219,17 @@ export default function Stock() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => { setEditingStock(entry); setIsDialogOpen(true); }}>
-                                    <Pencil className="mr-2 h-4 w-4" /> Adjust Stock
+                                  <DropdownMenuItem
+                                    className="cursor-pointer text-blue-700 focus:text-blue-800 focus:bg-blue-50"
+                                    onClick={() => { setActiveEntry(entry); setDialogMode("stock-in"); }}
+                                  >
+                                    <ArrowDownToLine className="mr-2 h-4 w-4" /> Stock In
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
+                                    onClick={() => { setActiveEntry(entry); setDialogMode("stock-out"); }}
+                                  >
+                                    <ArrowUpFromLine className="mr-2 h-4 w-4" /> Stock Out
                                   </DropdownMenuItem>
                                   {isAdmin && (
                                     <>
@@ -204,37 +257,128 @@ export default function Stock() {
         </CardContent>
       </Card>
 
-      {/* Adjust Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <form onSubmit={handleSave}>
+      {/* Add Product Dialog */}
+      <Dialog open={dialogMode === "add-product"} onOpenChange={(open) => !open && setDialogMode(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <form onSubmit={handleAddProduct}>
             <DialogHeader>
-              <DialogTitle>Adjust Inventory</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                Add Product to Inventory
+              </DialogTitle>
               <DialogDescription>
-                Update stock counts for {editingStock?.productName} ({editingStock?.vendorName})
+                Create a new inventory record for a product.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              {!isVendor && (
                 <div className="space-y-2">
-                  <Label htmlFor="receivedStock">Add Received</Label>
-                  <Input id="receivedStock" name="receivedStock" type="number" defaultValue="0" min="0" required />
+                  <Label htmlFor="vendorId">Vendor *</Label>
+                  <select
+                    id="vendorId" name="vendorId" required
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Select a vendor...</option>
+                    {vendors?.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.vendorCode})</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="damagedStock">Add Damaged/Lost</Label>
-                  <Input id="damagedStock" name="damagedStock" type="number" defaultValue="0" min="0" required />
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="productName">Product Name *</Label>
+                  <Input id="productName" name="productName" placeholder="e.g. Red Shoes" required />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="note">Adjustment Note</Label>
-                <Input id="note" name="note" placeholder="Reason for adjustment..." />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="productSku">SKU / Code</Label>
+                  <Input id="productSku" name="productSku" placeholder="e.g. SKU-001" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="openingStock">Opening Stock</Label>
+                  <Input id="openingStock" name="openingStock" type="number" min="0" defaultValue="0" />
+                </div>
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={updateMutation.isPending}>
+              <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Product
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock In Dialog */}
+      <Dialog open={dialogMode === "stock-in"} onOpenChange={(open) => !open && setDialogMode(null)}>
+        <DialogContent className="sm:max-w-[380px]">
+          <form onSubmit={handleStockMovement}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-blue-700">
+                <ArrowDownToLine className="h-5 w-5" />
+                Stock In — Receive Inventory
+              </DialogTitle>
+              <DialogDescription>
+                <span className="font-semibold text-foreground">{activeEntry?.productName}</span>
+                {activeEntry?.productSku && <span className="text-muted-foreground ml-1">(SKU: {activeEntry.productSku})</span>}
+                <br />
+                Current stock: <strong>{activeEntry?.currentStock}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="qty">Quantity Received *</Label>
+                <Input id="qty" name="qty" type="number" min="1" placeholder="e.g. 50" required autoFocus />
+              </div>
+              <div className="rounded-md bg-blue-50 border border-blue-100 px-3 py-2 text-sm text-blue-700">
+                This will add to the <strong>received stock</strong> counter and increase the current stock.
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={updateMutation.isPending}>
                 {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Stock
+                Confirm Stock In
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Out Dialog */}
+      <Dialog open={dialogMode === "stock-out"} onOpenChange={(open) => !open && setDialogMode(null)}>
+        <DialogContent className="sm:max-w-[380px]">
+          <form onSubmit={handleStockMovement}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <ArrowUpFromLine className="h-5 w-5" />
+                Stock Out — Remove / Write-off
+              </DialogTitle>
+              <DialogDescription>
+                <span className="font-semibold text-foreground">{activeEntry?.productName}</span>
+                {activeEntry?.productSku && <span className="text-muted-foreground ml-1">(SKU: {activeEntry.productSku})</span>}
+                <br />
+                Current stock: <strong>{activeEntry?.currentStock}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="qty">Quantity to Remove *</Label>
+                <Input id="qty" name="qty" type="number" min="1" placeholder="e.g. 5" required autoFocus />
+              </div>
+              <div className="rounded-md bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-700">
+                This will add to the <strong>damaged / written-off</strong> counter and reduce the current stock.
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
+              <Button type="submit" variant="destructive" disabled={updateMutation.isPending}>
+                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Confirm Stock Out
               </Button>
             </DialogFooter>
           </form>

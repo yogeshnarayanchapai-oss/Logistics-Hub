@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and } from "drizzle-orm";
+import { eq, ilike, and, sql } from "drizzle-orm";
 import { db, stockTable, vendorsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 
@@ -48,27 +48,76 @@ router.get("/stock", requireAuth, async (req, res): Promise<void> => {
   res.json(await Promise.all(stocks.map(formatStock)));
 });
 
-router.post("/stock", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
-  const { vendorId, productName, productSku, openingStock, receivedStock } = req.body;
-  if (!vendorId || !productName) { res.status(400).json({ error: "vendorId and productName required" }); return; }
+// Allow admin, manager, and vendor to create stock entries
+router.post("/stock", requireAuth, requireRole("admin", "manager", "vendor"), async (req, res): Promise<void> => {
+  const userId = (req as any).userId as number;
+  const userRole = (req as any).userRole as string;
+  let { vendorId, productName, productSku, openingStock } = req.body;
+
+  if (!productName) { res.status(400).json({ error: "productName required" }); return; }
+
+  // For vendors, auto-resolve their vendorId
+  if (userRole === "vendor") {
+    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
+    if (!vendor) { res.status(403).json({ error: "Vendor profile not found" }); return; }
+    vendorId = vendor.id;
+  }
+
+  if (!vendorId) { res.status(400).json({ error: "vendorId required" }); return; }
+
   const [s] = await db.insert(stockTable).values({
-    vendorId, productName, productSku: productSku ?? null,
+    vendorId: Number(vendorId),
+    productName,
+    productSku: productSku ?? null,
     openingStock: openingStock ?? 0,
-    receivedStock: receivedStock ?? 0,
+    receivedStock: openingStock ?? 0,
   }).returning();
   res.status(201).json(await formatStock(s));
 });
 
-router.patch("/stock/:id", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
+// PATCH: "stock-in" and "stock-out" movements — INCREMENT existing totals, never replace
+router.patch("/stock/:id", requireAuth, requireRole("admin", "manager", "vendor"), async (req, res): Promise<void> => {
+  const userId = (req as any).userId as number;
+  const userRole = (req as any).userRole as string;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  const updates: Record<string, unknown> = {};
-  const { receivedStock, damagedStock } = req.body;
-  if (receivedStock !== undefined) updates.receivedStock = receivedStock;
-  if (damagedStock !== undefined) updates.damagedStock = damagedStock;
-  const [s] = await db.update(stockTable).set(updates as any).where(eq(stockTable.id, id)).returning();
-  if (!s) { res.status(404).json({ error: "Stock entry not found" }); return; }
-  res.json(await formatStock(s));
+
+  // Verify entry exists (and vendor can only touch their own)
+  const [existing] = await db.select().from(stockTable).where(eq(stockTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Stock entry not found" }); return; }
+
+  if (userRole === "vendor") {
+    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
+    if (!vendor || vendor.id !== existing.vendorId) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+  }
+
+  const { type, qty, productName, productSku } = req.body;
+  const quantity = Number(qty) || 0;
+
+  // Allow updating product info
+  if (productName !== undefined || productSku !== undefined) {
+    const infoUpdates: any = {};
+    if (productName) infoUpdates.productName = productName;
+    if (productSku !== undefined) infoUpdates.productSku = productSku;
+    await db.update(stockTable).set(infoUpdates).where(eq(stockTable.id, id));
+  }
+
+  // Stock movements — always INCREMENT
+  if (type === "in" && quantity > 0) {
+    await db.update(stockTable)
+      .set({ receivedStock: sql`${stockTable.receivedStock} + ${quantity}` })
+      .where(eq(stockTable.id, id));
+  } else if (type === "out" && quantity > 0) {
+    await db.update(stockTable)
+      .set({ damagedStock: sql`${stockTable.damagedStock} + ${quantity}` })
+      .where(eq(stockTable.id, id));
+  }
+
+  const [updated] = await db.select().from(stockTable).where(eq(stockTable.id, id));
+  if (!updated) { res.status(404).json({ error: "Stock entry not found" }); return; }
+  res.json(await formatStock(updated));
 });
 
 router.delete("/stock/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {

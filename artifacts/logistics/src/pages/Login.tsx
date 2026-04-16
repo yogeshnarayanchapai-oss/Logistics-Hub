@@ -1,4 +1,3 @@
-import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -19,7 +18,6 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const [, setLocation] = useLocation();
   const { login: setAuthToken } = useAuth();
   const { toast } = useToast();
 
@@ -33,7 +31,6 @@ export default function Login() {
       onSuccess: (data) => {
         setAuthToken(data.token);
         toast({ title: "Welcome back", description: "Successfully logged in." });
-        setLocation("/dashboard");
       },
       onError: (error: any) => {
         toast({

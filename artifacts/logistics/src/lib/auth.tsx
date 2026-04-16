@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { useGetMe, setAuthTokenGetter } from "@workspace/api-client-react";
 import type { User } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem("authToken"));
+  const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
@@ -28,9 +29,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  // Once user loads after login, perform the pending redirect
+  useEffect(() => {
+    if (user && pendingRedirect) {
+      setLocation(pendingRedirect);
+      setPendingRedirect(null);
+    }
+  }, [user, pendingRedirect]);
+
   const login = (newToken: string) => {
     localStorage.setItem("authToken", newToken);
     setToken(newToken);
+    setPendingRedirect("/dashboard");
   };
 
   const logout = () => {

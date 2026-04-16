@@ -1,41 +1,61 @@
-import { useState } from "react";
-import { useListStations, useCreateStation, useUpdateStation, getListStationsQueryKey } from "@workspace/api-client-react";
+import { useState, useMemo } from "react";
+import { useListStations, useCreateStation, useUpdateStation, useDeleteStation, getListStationsQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, MapPin } from "lucide-react";
+import { Loader2, Plus, MapPin, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
 export default function Stations() {
-  const { data: stations, isLoading } = useListStations();
+  const { user } = useAuth();
+  const [statusFilter, setStatusFilter] = useState<string>("active");
+
+  const { data: allStations, isLoading } = useListStations();
+
+  const stations = useMemo(() => {
+    if (!allStations) return [];
+    if (statusFilter === "all") return allStations;
+    return allStations.filter((s) => s.status === statusFilter);
+  }, [allStations, statusFilter]);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<any>(null);
-  
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListStationsQueryKey() });
+
   const createMutation = useCreateStation({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListStationsQueryKey() });
-        toast({ title: "Station created successfully" });
-        setIsDialogOpen(false);
-      }
+      onSuccess: () => { invalidate(); toast({ title: "Station created successfully" }); setIsDialogOpen(false); }
     }
   });
 
   const updateMutation = useUpdateStation({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListStationsQueryKey() });
-        toast({ title: "Station updated successfully" });
-        setIsDialogOpen(false);
-      }
+      onSuccess: () => { invalidate(); toast({ title: "Station updated successfully" }); setIsDialogOpen(false); }
+    }
+  });
+
+  const deleteMutation = useDeleteStation({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Station deleted" }); setDeleteTarget(null); },
+      onError: () => { toast({ title: "Delete failed", variant: "destructive" }); setDeleteTarget(null); }
     }
   });
 
@@ -49,7 +69,6 @@ export default function Stations() {
       areaCoverage: formData.get("areaCoverage") as string || null,
       status: formData.get("status") as string || "active"
     };
-
     if (editingStation) {
       updateMutation.mutate({ id: editingStation.id, data });
     } else {
@@ -57,15 +76,21 @@ export default function Stations() {
     }
   };
 
-  const openNewDialog = () => {
-    setEditingStation(null);
-    setIsDialogOpen(true);
+  const toggleStatus = (station: any) => {
+    const newStatus = station.status === "active" ? "inactive" : "active";
+    updateMutation.mutate(
+      { id: station.id, data: { status: newStatus } },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: `Station ${newStatus === "active" ? "activated" : "deactivated"}` });
+        }
+      }
+    );
   };
 
-  const openEditDialog = (station: any) => {
-    setEditingStation(station);
-    setIsDialogOpen(true);
-  };
+  const isAdmin = user?.role === "admin";
+  const canManage = ["admin", "manager"].includes(user?.role || "");
 
   return (
     <div className="space-y-6">
@@ -74,11 +99,30 @@ export default function Stations() {
           <h2 className="text-2xl font-bold tracking-tight">Service Stations</h2>
           <p className="text-muted-foreground">Manage logistics hubs and delivery zones.</p>
         </div>
-        <Button onClick={openNewDialog}><Plus className="mr-2 h-4 w-4" /> Add Station</Button>
+        {canManage && (
+          <Button onClick={() => { setEditingStation(null); setIsDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" /> Add Station
+          </Button>
+        )}
       </div>
 
       <Card>
-        <CardContent className="p-0">
+        <CardHeader className="pb-3">
+          <div className="flex justify-end">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0 pt-0">
           {isLoading ? (
             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : (
@@ -95,13 +139,13 @@ export default function Stations() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stations?.length === 0 ? (
+                  {!stations.length ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No stations found.</TableCell>
                     </TableRow>
                   ) : (
-                    stations?.map((station) => (
-                      <TableRow key={station.id}>
+                    stations.map((station) => (
+                      <TableRow key={station.id} className={station.status === "inactive" ? "opacity-60" : ""}>
                         <TableCell className="font-medium">{station.code}</TableCell>
                         <TableCell>
                           <div className="font-medium flex items-center gap-2">
@@ -110,13 +154,40 @@ export default function Stations() {
                           </div>
                           {station.address && <div className="text-xs text-muted-foreground">{station.address}</div>}
                         </TableCell>
-                        <TableCell>{station.areaCoverage || "-"}</TableCell>
+                        <TableCell>{station.areaCoverage || "—"}</TableCell>
                         <TableCell>{station.riderCount}</TableCell>
                         <TableCell>
-                          <Badge variant={station.status === 'active' ? 'default' : 'secondary'}>{station.status}</Badge>
+                          <Badge variant={station.status === "active" ? "default" : "secondary"}>{station.status}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(station)}>Edit</Button>
+                          <div className="flex items-center justify-end gap-1">
+                            {canManage && (
+                              <Button variant="ghost" size="sm" onClick={() => { setEditingStation(station); setIsDialogOpen(true); }}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                              </Button>
+                            )}
+                            {canManage && (
+                              <Button
+                                variant="ghost" size="sm"
+                                className={station.status === "active" ? "text-orange-600 hover:text-orange-700" : "text-green-600 hover:text-green-700"}
+                                onClick={() => toggleStatus(station)}
+                                disabled={updateMutation.isPending}
+                              >
+                                {station.status === "active"
+                                  ? <><ToggleRight className="h-3.5 w-3.5 mr-1" /> Deactivate</>
+                                  : <><ToggleLeft className="h-3.5 w-3.5 mr-1" /> Activate</>}
+                              </Button>
+                            )}
+                            {isAdmin && (
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget({ id: station.id, name: station.name })}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -128,6 +199,7 @@ export default function Stations() {
         </CardContent>
       </Card>
 
+      {/* Edit / Create Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <form onSubmit={handleSave}>
@@ -159,9 +231,8 @@ export default function Stations() {
               {editingStation && (
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
-                  <select 
-                    id="status" 
-                    name="status" 
+                  <select
+                    id="status" name="status"
                     defaultValue={editingStation.status}
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
@@ -174,13 +245,35 @@ export default function Stations() {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Station</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -290,13 +290,14 @@ export default function OrdersList() {
                     <TableHead>Location</TableHead>
                     <TableHead>COD Amount</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Rider</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {!orders.length ? (
                     <TableRow>
-                      <TableCell colSpan={canDelete ? 8 : 7} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={canDelete ? 9 : 8} className="text-center py-12 text-muted-foreground">
                         No orders found.
                       </TableCell>
                     </TableRow>
@@ -333,6 +334,11 @@ export default function OrdersList() {
                         </TableCell>
                         <TableCell className="font-medium">Rs. {order.codAmount.toLocaleString()}</TableCell>
                         <TableCell><StatusBadge status={order.status} /></TableCell>
+                        <TableCell className="text-sm">
+                          {order.riderName
+                            ? <span className="font-medium">{order.riderName}</span>
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Link href={`/orders/${order.id}`}>

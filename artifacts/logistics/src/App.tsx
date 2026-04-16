@@ -29,6 +29,7 @@ import TicketDetail from "@/pages/tickets/TicketDetail";
 import Notifications from "@/pages/Notifications";
 import AuditLogs from "@/pages/AuditLogs";
 import VendorReport from "@/pages/VendorReport";
+import VendorComments from "@/pages/VendorComments";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import { Loader2 } from "lucide-react";
@@ -91,6 +92,7 @@ function Router() {
       <Route path="/stock"><ProtectedRoute component={Stock} roles={["admin", "manager", "vendor"]} /></Route>
       <Route path="/payments"><ProtectedRoute component={Payments} roles={["admin", "manager", "vendor"]} /></Route>
       <Route path="/vendor-report"><ProtectedRoute component={VendorReport} roles={["vendor"]} /></Route>
+      <Route path="/vendor-comments"><ProtectedRoute component={VendorComments} roles={["vendor"]} /></Route>
       <Route path="/bank-accounts"><ProtectedRoute component={BankAccounts} roles={["admin", "vendor"]} /></Route>
       <Route path="/tickets"><ProtectedRoute component={TicketsList} /></Route>
       <Route path="/tickets/:id"><ProtectedRoute component={TicketDetail} /></Route>

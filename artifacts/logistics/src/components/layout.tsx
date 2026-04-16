@@ -17,6 +17,7 @@ import {
   UserCheck,
   BarChart2,
   UserCircle,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +51,7 @@ export function Layout({ children }: LayoutProps) {
     { name: "Stock Inventory", href: "/stock", icon: Package, roles: ["admin", "manager", "vendor"] },
     { name: "Payments", href: "/payments", icon: Wallet, roles: ["admin", "manager", "vendor"] },
     { name: "My Reports", href: "/vendor-report", icon: BarChart2, roles: ["vendor"] },
+    { name: "Today's Comments", href: "/vendor-comments", icon: MessageSquare, roles: ["vendor"] },
     { name: "Support Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "manager", "vendor", "rider"] },
     { name: "Audit Logs", href: "/audit-logs", icon: Activity, roles: ["admin"] },
   ];

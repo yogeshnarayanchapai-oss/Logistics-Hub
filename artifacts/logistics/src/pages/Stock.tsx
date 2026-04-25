@@ -249,6 +249,9 @@ export default function Stock() {
         <TabsList>
           <TabsTrigger value="inventory"><Package className="mr-1.5 h-4 w-4" /> Inventory</TabsTrigger>
           <TabsTrigger value="movements"><History className="mr-1.5 h-4 w-4" /> Movements</TabsTrigger>
+          {canManage && !isVendor && (
+            <TabsTrigger value="rider-inventory"><Truck className="mr-1.5 h-4 w-4" /> Rider Inventory</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="inventory" className="mt-4">
@@ -514,6 +517,75 @@ export default function Stock() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canManage && !isVendor && (
+          <TabsContent value="rider-inventory" className="mt-4">
+            <Card>
+              <CardContent className="p-0">
+                {riderInvLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+                ) : riderInventories.length === 0 ? (
+                  <div className="flex flex-col items-center py-10 text-center text-muted-foreground">
+                    <Package className="h-10 w-10 mb-2 opacity-20" />
+                    <p>No inventory has been assigned to riders yet.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Rider</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-center">Assigned</TableHead>
+                          <TableHead className="text-center">Delivered</TableHead>
+                          <TableHead className="text-center">Returned</TableHead>
+                          <TableHead className="text-center">In Hand</TableHead>
+                          <TableHead className="text-center">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {riderInventories.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
+                                  {(entry.riderName || "R").charAt(0).toUpperCase()}
+                                </div>
+                                <span className="font-medium text-sm">{entry.riderName || `Rider #${entry.riderId}`}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">{entry.productName}</div>
+                              {entry.productSku && <div className="text-xs text-muted-foreground">SKU: {entry.productSku}</div>}
+                            </TableCell>
+                            <TableCell className="text-center">{entry.assignedQty}</TableCell>
+                            <TableCell className="text-center text-green-700 font-medium">{entry.deliveredQty}</TableCell>
+                            <TableCell className="text-center text-orange-600 font-medium">{entry.returnedQty}</TableCell>
+                            <TableCell className="text-center">
+                              <span className={`font-bold ${entry.currentQty > 0 ? "text-blue-700" : "text-muted-foreground"}`}>
+                                {entry.currentQty}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {entry.currentQty > 0 && (
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => { setReturnEntry(entry); setDialogMode("return-inventory"); }}
+                                >
+                                  <Undo2 className="mr-1 h-3.5 w-3.5" /> Return
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Add Product Dialog */}
@@ -644,80 +716,6 @@ export default function Stock() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Rider Inventory Section ── */}
-      {canManage && !isVendor && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Rider Inventory</h3>
-            <span className="text-xs text-muted-foreground ml-1">— items currently held by riders</span>
-          </div>
-          <Card>
-            <CardContent className="p-0">
-              {riderInvLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-              ) : riderInventories.length === 0 ? (
-                <div className="flex flex-col items-center py-10 text-center text-muted-foreground">
-                  <Package className="h-10 w-10 mb-2 opacity-20" />
-                  <p>No inventory has been assigned to riders yet.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Rider</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-center">Assigned</TableHead>
-                        <TableHead className="text-center">Delivered</TableHead>
-                        <TableHead className="text-center">Returned</TableHead>
-                        <TableHead className="text-center">In Hand</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {riderInventories.map((entry) => (
-                        <TableRow key={entry.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
-                                {(entry.riderName || "R").charAt(0).toUpperCase()}
-                              </div>
-                              <span className="font-medium text-sm">{entry.riderName || `Rider #${entry.riderId}`}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{entry.productName}</div>
-                            {entry.productSku && <div className="text-xs text-muted-foreground">SKU: {entry.productSku}</div>}
-                          </TableCell>
-                          <TableCell className="text-center">{entry.assignedQty}</TableCell>
-                          <TableCell className="text-center text-green-700 font-medium">{entry.deliveredQty}</TableCell>
-                          <TableCell className="text-center text-orange-600 font-medium">{entry.returnedQty}</TableCell>
-                          <TableCell className="text-center">
-                            <span className={`font-bold ${entry.currentQty > 0 ? "text-blue-700" : "text-muted-foreground"}`}>
-                              {entry.currentQty}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {entry.currentQty > 0 && (
-                              <Button
-                                size="sm" variant="outline"
-                                onClick={() => { setReturnEntry(entry); setDialogMode("return-inventory"); }}
-                              >
-                                <Undo2 className="mr-1 h-3.5 w-3.5" /> Return
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Assign Inventory Dialog */}
       <Dialog open={dialogMode === "assign-inventory"} onOpenChange={(open) => !open && setDialogMode(null)}>

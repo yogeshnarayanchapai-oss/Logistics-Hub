@@ -230,6 +230,9 @@ export interface CreateRiderBody {
   stationId?: number | null;
   /** @nullable */
   userId?: number | null;
+  /** @nullable */
+  coverageArea?: string | null;
+  commissionRate?: number;
 }
 
 export interface UpdateRiderBody {
@@ -242,6 +245,9 @@ export interface UpdateRiderBody {
   /** @nullable */
   stationId?: number | null;
   status?: string;
+  /** @nullable */
+  coverageArea?: string | null;
+  commissionRate?: number;
 }
 
 export type OrderPriority = (typeof OrderPriority)[keyof typeof OrderPriority];

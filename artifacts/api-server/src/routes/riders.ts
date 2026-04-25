@@ -144,6 +144,39 @@ router.patch("/riders/:id", requireAuth, requireRole("admin", "manager"), async 
   res.json(await formatRider(rider));
 });
 
+// POST /riders/backfill-commissions — admin: create commission records for past delivered orders
+router.post("/riders/backfill-commissions", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
+  const userId = (req as any).userId as number;
+  const allRiders = await db.select().from(ridersTable);
+  const riderMap = new Map(allRiders.map(r => [r.id, r]));
+
+  const deliveredOrders = await db.select().from(ordersTable)
+    .where(eq(ordersTable.status, "delivered"));
+
+  const existingCommissions = await db.select({ orderId: riderCommissionsTable.orderId })
+    .from(riderCommissionsTable);
+  const existingOrderIds = new Set(existingCommissions.map(c => c.orderId).filter(Boolean));
+
+  let created = 0;
+  for (const order of deliveredOrders) {
+    if (!order.riderId) continue;
+    if (order.id && existingOrderIds.has(order.id)) continue;
+    const rider = riderMap.get(order.riderId);
+    if (!rider || Number(rider.commissionRate ?? 0) <= 0) continue;
+    await db.insert(riderCommissionsTable).values({
+      riderId: order.riderId,
+      orderId: order.id,
+      orderCode: order.orderCode,
+      amount: rider.commissionRate!.toString(),
+      status: "earned",
+    });
+    created++;
+  }
+
+  await createAuditLog({ userId, action: "backfill", entity: "rider_commission", entityId: 0, description: `Backfilled ${created} commission records` });
+  res.json({ created, message: `Created ${created} commission record${created !== 1 ? "s" : ""} for past deliveries.` });
+});
+
 router.delete("/riders/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const actorId = (req as any).userId as number;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;

@@ -17,4 +17,7 @@ export interface CreateRiderBody {
   stationId?: number | null;
   /** @nullable */
   userId?: number | null;
+  /** @nullable */
+  coverageArea?: string | null;
+  commissionRate?: number;
 }

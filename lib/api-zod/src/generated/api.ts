@@ -378,6 +378,8 @@ export const CreateRiderBody = zod.object({
   vehicleNumber: zod.string().nullish(),
   stationId: zod.number().nullish(),
   userId: zod.number().nullish(),
+  coverageArea: zod.string().nullish(),
+  commissionRate: zod.number().optional(),
 });
 
 /**
@@ -416,6 +418,8 @@ export const UpdateRiderBody = zod.object({
   vehicleNumber: zod.string().nullish(),
   stationId: zod.number().nullish(),
   status: zod.string().optional(),
+  coverageArea: zod.string().nullish(),
+  commissionRate: zod.number().optional(),
 });
 
 export const UpdateRiderResponse = zod.object({

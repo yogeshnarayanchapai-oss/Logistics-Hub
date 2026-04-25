@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Truck, Pencil, ToggleLeft, ToggleRight, MoreHorizontal, X, CreditCard, Building, Trash2 } from "lucide-react";
+import { Loader2, Plus, Search, Truck, Pencil, ToggleLeft, ToggleRight, MoreHorizontal, X, CreditCard, Building, Trash2, RefreshCw } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -211,6 +211,23 @@ export default function Riders() {
   const isAdmin = user?.role === "admin";
   const canManage = ["admin", "manager"].includes(user?.role || "");
 
+  const [backfillPending, setBackfillPending] = useState(false);
+  const handleBackfillCommissions = async () => {
+    if (!window.confirm("This will create commission records for all past delivered orders where the assigned rider has a commission rate set. Continue?")) return;
+    setBackfillPending(true);
+    try {
+      const res = await fetch(`${BASE}/api/riders/backfill-commissions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      toast({ title: "Backfill complete", description: data.message });
+    } catch (err: any) {
+      toast({ title: err.message || "Backfill failed", variant: "destructive" });
+    } finally { setBackfillPending(false); }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -218,11 +235,19 @@ export default function Riders() {
           <h2 className="text-2xl font-bold tracking-tight">Riders</h2>
           <p className="text-muted-foreground">Manage delivery personnel.</p>
         </div>
-        {canManage && (
-          <Button onClick={() => { setEditingRider(null); setIsDialogOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Add Rider
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={handleBackfillCommissions} disabled={backfillPending}>
+              {backfillPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Backfill Commissions
+            </Button>
+          )}
+          {canManage && (
+            <Button onClick={() => { setEditingRider(null); setIsDialogOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" /> Add Rider
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>

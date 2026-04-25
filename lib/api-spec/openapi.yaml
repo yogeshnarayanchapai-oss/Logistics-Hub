@@ -1646,6 +1646,10 @@ components:
           type: ["integer", "null"]
         userId:
           type: ["integer", "null"]
+        coverageArea:
+          type: ["string", "null"]
+        commissionRate:
+          type: number
       required:
         - name
         - email
@@ -1665,6 +1669,10 @@ components:
           type: ["integer", "null"]
         status:
           type: string
+        coverageArea:
+          type: ["string", "null"]
+        commissionRate:
+          type: number
 
     Order:
       type: object

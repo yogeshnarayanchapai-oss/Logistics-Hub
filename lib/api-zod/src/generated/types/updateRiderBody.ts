@@ -16,4 +16,7 @@ export interface UpdateRiderBody {
   /** @nullable */
   stationId?: number | null;
   status?: string;
+  /** @nullable */
+  coverageArea?: string | null;
+  commissionRate?: number;
 }

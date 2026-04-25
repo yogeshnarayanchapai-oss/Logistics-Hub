@@ -853,6 +853,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StockEntry"
+    delete:
+      operationId: deleteStockEntry
+      tags: [stock]
+      summary: Delete a stock entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Stock entry deleted
 
   # Bank Accounts
   /bank-accounts:

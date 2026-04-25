@@ -952,6 +952,13 @@ export const UpdateStockEntryResponse = zod.object({
 });
 
 /**
+ * @summary Delete a stock entry
+ */
+export const DeleteStockEntryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List bank accounts
  */
 export const ListBankAccountsQueryParams = zod.object({

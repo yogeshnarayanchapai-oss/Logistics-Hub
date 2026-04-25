@@ -262,13 +262,127 @@ export default function Payments() {
         </div>
       )}
 
-      <Tabs defaultValue="vendor">
+      <Tabs defaultValue={isAdmin ? "all" : "vendor"}>
         <TabsList>
+          {isAdmin && <TabsTrigger value="all">All Requests</TabsTrigger>}
           <TabsTrigger value="vendor"><DollarSign className="mr-1.5 h-4 w-4" /> Vendor Payments</TabsTrigger>
           {isAdmin && (
             <TabsTrigger value="rider"><Truck className="mr-1.5 h-4 w-4" /> Rider Commissions</TabsTrigger>
           )}
         </TabsList>
+
+        {/* ── All Requests (Admin/Manager) ── */}
+        {isAdmin && (
+          <TabsContent value="all" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Payment Requests</CardTitle>
+                <CardDescription>Combined vendor and rider commission payment requests.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {isLoading || riderPaymentsLoading ? (
+                  <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                ) : (
+                  <div className="rounded-md overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Party</TableHead>
+                          <TableHead>Account Info</TableHead>
+                          <TableHead className="text-right">Requested</TableHead>
+                          <TableHead className="text-right">Approved</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(!payments?.length && !riderPayments.length) ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
+                          </TableRow>
+                        ) : (
+                          <>
+                            {payments?.map((payment) => (
+                              <TableRow key={`v-${payment.id}`}>
+                                <TableCell className="font-medium text-sm">{format(new Date(payment.createdAt), "MMM d, yyyy")}</TableCell>
+                                <TableCell><Badge variant="outline" className="text-xs">Vendor</Badge></TableCell>
+                                <TableCell className="text-sm">{payment.vendorName}</TableCell>
+                                <TableCell>
+                                  <div className="text-sm max-w-[160px] truncate">{payment.bankAccountInfo}</div>
+                                  {payment.referenceId && <div className="text-xs text-muted-foreground">Ref: {payment.referenceId}</div>}
+                                </TableCell>
+                                <TableCell className="text-right">Rs. {payment.requestedAmount.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{payment.approvedAmount ? `Rs. ${payment.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                                <TableCell>
+                                  <Badge variant={payment.status === 'pending' ? 'secondary' : payment.status === 'approved' ? 'default' : payment.status === 'released' ? 'outline' : 'destructive'}
+                                    className={payment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
+                                    {payment.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    {payment.status === 'pending' && (
+                                      <>
+                                        <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(payment); setActionType('reject'); }}>Reject</Button>
+                                        <Button size="sm" onClick={() => { setSelectedPayment(payment); setActionType('approve'); }}>Approve</Button>
+                                      </>
+                                    )}
+                                    {payment.status === 'approved' && (
+                                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setSelectedPayment(payment); setActionType('release'); }}>Mark Released</Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {riderPayments.map((rp) => (
+                              <TableRow key={`r-${rp.id}`}>
+                                <TableCell className="font-medium text-sm">{format(new Date(rp.createdAt), "MMM d, yyyy")}</TableCell>
+                                <TableCell><Badge variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200">Rider</Badge></TableCell>
+                                <TableCell>
+                                  <div className="text-sm font-medium">{rp.riderName}</div>
+                                  <div className="text-xs text-muted-foreground">{rp.riderEmail}</div>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <div>{rp.bankName}</div>
+                                  <div className="text-muted-foreground text-xs">{rp.accountNumber}</div>
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">Rs. {rp.requestedAmount.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{rp.approvedAmount ? `Rs. ${rp.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={riderPaymentStatusColor[rp.status] ?? ""}>
+                                    {rp.status === "released" && <CheckCircle className="mr-1 h-3 w-3" />}
+                                    {rp.status === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
+                                    {rp.status.charAt(0).toUpperCase() + rp.status.slice(1)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {rp.status === "pending" && (
+                                    <div className="flex justify-end gap-2">
+                                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
+                                        onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
+                                        Reject
+                                      </Button>
+                                      <Button size="sm"
+                                        onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
+                                        Release
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {/* ── Vendor Payment Requests ── */}
         <TabsContent value="vendor" className="mt-4">

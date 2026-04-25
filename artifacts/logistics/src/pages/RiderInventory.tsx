@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, PackageCheck, PackageOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Package, PackageCheck, PackageOpen, RefreshCw } from "lucide-react";
 
 export default function RiderInventory() {
   const { user } = useAuth();
@@ -11,18 +12,25 @@ export default function RiderInventory() {
   const [loading, setLoading] = useState(true);
 
   const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-  const token = () => localStorage.getItem("auth_token");
+  const token = () => localStorage.getItem("authToken");
 
-  const fetchInventory = () => {
+  const fetchInventory = useCallback(() => {
     setLoading(true);
     fetch(`${BASE}/api/rider-inventory`, { headers: { Authorization: `Bearer ${token()}` } })
       .then((r) => r.json())
       .then((d) => setEntries(Array.isArray(d) ? d : []))
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
-  };
+  }, [BASE]);
 
-  useEffect(() => { fetchInventory(); }, []);
+  useEffect(() => { fetchInventory(); }, [fetchInventory]);
+
+  // Re-fetch when tab becomes visible (e.g. returning from admin Stock page)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") fetchInventory(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchInventory]);
 
   const totalAssigned = entries.reduce((s, e) => s + e.assignedQty, 0);
   const totalDelivered = entries.reduce((s, e) => s + e.deliveredQty, 0);
@@ -30,9 +38,15 @@ export default function RiderInventory() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">My Inventory</h2>
-        <p className="text-muted-foreground">Products assigned to you for delivery.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">My Inventory</h2>
+          <p className="text-muted-foreground">Products assigned to you for delivery.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchInventory} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Summary cards */}

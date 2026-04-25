@@ -98,7 +98,7 @@ export default function Riders() {
   const { toast } = useToast();
 
   const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-  const token = () => localStorage.getItem("auth_token");
+  const token = () => localStorage.getItem("authToken");
 
   const [bankRider, setBankRider] = useState<any>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);

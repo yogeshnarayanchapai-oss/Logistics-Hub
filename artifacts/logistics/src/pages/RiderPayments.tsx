@@ -28,7 +28,7 @@ export default function RiderPayments() {
   const { user } = useAuth();
   const { toast } = useToast();
   const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-  const token = () => localStorage.getItem("auth_token");
+  const token = () => localStorage.getItem("authToken");
 
   const [summary, setSummary] = useState({ totalEarned: 0, totalReleased: 0, pendingBalance: 0, totalOrders: 0 });
   const [commissions, setCommissions] = useState<any[]>([]);
@@ -177,11 +177,11 @@ export default function RiderPayments() {
         </Card>
       </div>
 
-      <Tabs defaultValue="commissions">
+      <Tabs defaultValue="requests">
         <TabsList>
-          <TabsTrigger value="commissions">Commission Log</TabsTrigger>
           <TabsTrigger value="requests">Payment Requests</TabsTrigger>
           <TabsTrigger value="banks">Bank Accounts</TabsTrigger>
+          <TabsTrigger value="commissions">Commission Log</TabsTrigger>
         </TabsList>
 
         <TabsContent value="commissions">

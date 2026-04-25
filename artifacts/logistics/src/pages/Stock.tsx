@@ -157,6 +157,7 @@ export default function Stock() {
   const [deassignRiderId, setDeassignRiderId] = useState<string>("");
   const [deassignEntryId, setDeassignEntryId] = useState<string>("");
   const [deassignQty, setDeassignQty] = useState<string>("");
+  const [deassignNote, setDeassignNote] = useState<string>("");
 
   const { data: riders } = useListRiders({ status: "active" });
 
@@ -267,7 +268,7 @@ export default function Stock() {
       const res = await fetch(`${BASE}/api/rider-inventory/return`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
-        body: JSON.stringify({ entryId: Number(deassignEntryId), qty: Number(deassignQty) }),
+        body: JSON.stringify({ entryId: Number(deassignEntryId), qty: Number(deassignQty), note: deassignNote.trim() || undefined }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
       toast({ title: "Inventory deassigned — stock returned to office" });
@@ -275,6 +276,7 @@ export default function Stock() {
       setDeassignRiderId("");
       setDeassignEntryId("");
       setDeassignQty("");
+      setDeassignNote("");
       fetchRiderInventories();
       queryClient.invalidateQueries({ queryKey: getListStockQueryKey() });
     } catch (err: any) {
@@ -922,16 +924,14 @@ export default function Stock() {
               />
             </div>
 
-            {assignDialogTab === "assign" && (
-              <div className="space-y-2">
-                <Label>Note (optional)</Label>
-                <Input
-                  placeholder="e.g. For Kathmandu route"
-                  value={assignNote}
-                  onChange={(e) => setAssignNote(e.target.value)}
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Note (optional)</Label>
+              <Input
+                placeholder={assignDialogTab === "assign" ? "e.g. For Kathmandu route" : "e.g. Returned — damaged packaging"}
+                value={assignDialogTab === "assign" ? assignNote : deassignNote}
+                onChange={(e) => assignDialogTab === "assign" ? setAssignNote(e.target.value) : setDeassignNote(e.target.value)}
+              />
+            </div>
           </div>
 
           <DialogFooter>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, KeyboardEvent } from "react";
 import { useListStations, useCreateStation, useUpdateStation, useDeleteStation, getListStationsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,13 +15,76 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, MapPin, Pencil, Trash2, ToggleLeft, ToggleRight, MoreHorizontal } from "lucide-react";
+import { Loader2, Plus, MapPin, Pencil, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, X } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+
+function AreaTagsInput({ defaultValue }: { defaultValue?: string | null }) {
+  const [tags, setTags] = useState<string[]>(() =>
+    defaultValue ? defaultValue.split(",").map(t => t.trim()).filter(Boolean) : []
+  );
+  const [inputVal, setInputVal] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const addTag = (raw: string) => {
+    const newTags = raw.split(",").map(t => t.trim()).filter(Boolean);
+    setTags(prev => {
+      const combined = [...prev];
+      newTags.forEach(t => { if (!combined.includes(t)) combined.push(t); });
+      return combined;
+    });
+    setInputVal("");
+  };
+
+  const removeTag = (idx: number) => setTags(prev => prev.filter((_, i) => i !== idx));
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      if (inputVal.trim()) addTag(inputVal);
+    } else if (e.key === "Backspace" && !inputVal && tags.length) {
+      removeTag(tags.length - 1);
+    }
+  };
+
+  const handleBlur = () => {
+    if (inputVal.trim()) addTag(inputVal);
+  };
+
+  return (
+    <div
+      className="min-h-[38px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm shadow-sm cursor-text flex flex-wrap gap-1.5 focus-within:ring-1 focus-within:ring-ring"
+      onClick={() => inputRef.current?.focus()}
+    >
+      {tags.map((tag, i) => (
+        <span key={i} className="inline-flex items-center gap-1 rounded bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">
+          {tag}
+          <button type="button" onClick={() => removeTag(i)} className="hover:text-destructive">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        value={inputVal}
+        onChange={e => {
+          const val = e.target.value;
+          if (val.includes(",")) { addTag(val); }
+          else setInputVal(val);
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        placeholder={tags.length === 0 ? "Type area name, press Enter or comma…" : ""}
+        className="flex-1 min-w-[120px] bg-transparent outline-none placeholder:text-muted-foreground text-sm"
+      />
+      <input type="hidden" name="areaCoverage" value={tags.join(", ")} />
+    </div>
+  );
+}
 
 export default function Stations() {
   const { user } = useAuth();
@@ -160,7 +223,15 @@ export default function Stations() {
                           </div>
                           {station.address && <div className="text-xs text-muted-foreground">{station.address}</div>}
                         </TableCell>
-                        <TableCell>{(station as any).areaCoverage || "—"}</TableCell>
+                        <TableCell className="max-w-[220px]">
+                          {(station as any).areaCoverage
+                            ? <div className="flex flex-wrap gap-1">
+                                {(station as any).areaCoverage.split(",").map((a: string) => a.trim()).filter(Boolean).map((a: string, i: number) => (
+                                  <Badge key={i} variant="secondary" className="text-xs font-normal">{a}</Badge>
+                                ))}
+                              </div>
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-right font-medium">
                           Rs. {((station as any).deliveryCharge ?? 0).toLocaleString()}
                         </TableCell>
@@ -242,8 +313,9 @@ export default function Stations() {
                 <Input id="address" name="address" defaultValue={editingStation?.address} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="areaCoverage">Area Coverage (comma separated)</Label>
-                <Input id="areaCoverage" name="areaCoverage" defaultValue={editingStation?.areaCoverage} />
+                <Label>Area Coverage</Label>
+                <AreaTagsInput key={editingStation?.id ?? "new"} defaultValue={(editingStation as any)?.areaCoverage} />
+                <p className="text-xs text-muted-foreground">Type an area name then press Enter or comma to add it as a tag.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deliveryCharge">Delivery Charge (Rs.) *</Label>

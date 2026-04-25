@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { useRolePrefix } from "@/lib/use-role-prefix";
 import { useQueryClient } from "@tanstack/react-query";
@@ -58,6 +58,7 @@ export default function NewOrder() {
 
   const isVendor = user?.role === "vendor";
   const defaultVendorId = isVendor && user?.vendorId ? user.vendorId : 0;
+  const [areaMode, setAreaMode] = useState<"select" | "custom">("select");
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
@@ -85,6 +86,15 @@ export default function NewOrder() {
   });
 
   const { data: stations } = useListStations();
+
+  const coverageAreas = useMemo(() => {
+    const set = new Set<string>();
+    (stations ?? []).forEach(s => {
+      const cov = (s as any).areaCoverage as string | null | undefined;
+      if (cov) cov.split(",").map(t => t.trim()).filter(Boolean).forEach(t => set.add(t));
+    });
+    return Array.from(set).sort();
+  }, [stations]);
 
   const createOrderMutation = useCreateOrder({
     mutation: {
@@ -180,7 +190,49 @@ export default function NewOrder() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="area">Area/Tole</Label>
-                  <Input id="area" {...form.register("area")} />
+                  {areaMode === "select" ? (
+                    <Select
+                      value={form.watch("area") || ""}
+                      onValueChange={(val) => {
+                        if (val === "__custom__") {
+                          setAreaMode("custom");
+                          form.setValue("area", "");
+                        } else {
+                          form.setValue("area", val);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an area…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {coverageAreas.map(a => (
+                          <SelectItem key={a} value={a}>{a}</SelectItem>
+                        ))}
+                        <SelectItem value="__custom__">+ Custom area…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        id="area"
+                        {...form.register("area")}
+                        placeholder="Type custom area / tole"
+                        autoFocus
+                      />
+                      {coverageAreas.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => { setAreaMode("select"); form.setValue("area", ""); }}
+                        >
+                          List
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

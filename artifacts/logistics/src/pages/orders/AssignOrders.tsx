@@ -15,12 +15,28 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Loader2, Search, X, UserCheck, ArrowDownNarrowWide } from "lucide-react";
+import { Loader2, Search, X, UserCheck, ArrowDownNarrowWide, Star, MapPin } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
+// Returns true if any keyword from the rider's coverage area appears in the order location string
+function matchesCoverage(coverageArea: string | null | undefined, orderLocation: string): boolean {
+  if (!coverageArea || !orderLocation) return false;
+  const normalize = (s: string) => s.toLowerCase().replace(/[,\/\-\.]/g, " ");
+  const riderKeywords = normalize(coverageArea).split(/\s+/).filter(w => w.length > 2);
+  const locationNorm = normalize(orderLocation);
+  return riderKeywords.some(kw => locationNorm.includes(kw));
+}
+
 // Single-order assign popover (for the Assign button per row)
-function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; stationId?: number | null; onAssigned: () => void }) {
+function AssignButton({
+  orderId, stationId, orderLocation, onAssigned,
+}: {
+  orderId: number;
+  stationId?: number | null;
+  orderLocation: string;
+  onAssigned: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [selectedRider, setSelectedRider] = useState<string>("");
   const { toast } = useToast();
@@ -41,6 +57,21 @@ function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; sta
     },
   });
 
+  // Split riders into suggested (coverage match) and rest
+  const { suggested, rest } = (riders ?? []).reduce(
+    (acc, r) => {
+      if (matchesCoverage((r as any).coverageArea, orderLocation)) {
+        acc.suggested.push(r);
+      } else {
+        acc.rest.push(r);
+      }
+      return acc;
+    },
+    { suggested: [] as typeof riders, rest: [] as typeof riders }
+  );
+  const sortedRiders = [...(suggested ?? []), ...(rest ?? [])];
+  const suggestedIds = new Set((suggested ?? []).map(r => r.id));
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -49,23 +80,66 @@ function AssignButton({ orderId, stationId, onAssigned }: { orderId: number; sta
           Assign
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-3" align="end">
+      <PopoverContent className="w-72 p-3" align="end">
         <div className="space-y-3">
-          <p className="text-sm font-medium">Assign Rider</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Assign Rider</p>
+            {suggested && suggested.length > 0 && (
+              <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                {suggested.length} suggested
+              </span>
+            )}
+          </div>
+          {orderLocation && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 rounded px-2 py-1.5">
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="truncate">{orderLocation}</span>
+            </div>
+          )}
           <Select value={selectedRider} onValueChange={setSelectedRider}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a rider..." />
             </SelectTrigger>
             <SelectContent>
-              {!riders?.length ? (
+              {!sortedRiders.length ? (
                 <SelectItem value="none" disabled>No riders available</SelectItem>
               ) : (
-                riders.map((r) => (
-                  <SelectItem key={r.id} value={String(r.id)}>
-                    <span className="font-medium">{r.name}</span>
-                    {r.stationName && <span className="text-muted-foreground ml-1 text-xs">· {r.stationName}</span>}
-                  </SelectItem>
-                ))
+                <>
+                  {(suggested ?? []).length > 0 && (
+                    <>
+                      <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-600 flex items-center gap-1">
+                        <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" /> Suggested
+                      </div>
+                      {(suggested ?? []).map(r => (
+                        <SelectItem key={r.id} value={String(r.id)}>
+                          <div className="flex items-center gap-1.5">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
+                            <span className="font-medium">{r.name}</span>
+                            {r.stationName && <span className="text-muted-foreground text-xs">· {r.stationName}</span>}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {(rest ?? []).length > 0 && (
+                    <>
+                      {(suggested ?? []).length > 0 && (
+                        <div className="px-2 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1 border-t mt-1">
+                          Other Riders
+                        </div>
+                      )}
+                      {(rest ?? []).map(r => (
+                        <SelectItem key={r.id} value={String(r.id)}>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">{r.name}</span>
+                            {r.stationName && <span className="text-muted-foreground text-xs">· {r.stationName}</span>}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </>
               )}
             </SelectContent>
           </Select>
@@ -319,6 +393,7 @@ export default function AssignOrders() {
                           <AssignButton
                             orderId={order.id}
                             stationId={order.stationId}
+                            orderLocation={[order.address, order.city, order.stationName].filter(Boolean).join(" ")}
                             onAssigned={() => {
                               setSelectedIds((prev) => { const n = new Set(prev); n.delete(order.id); return n; });
                               invalidateList();

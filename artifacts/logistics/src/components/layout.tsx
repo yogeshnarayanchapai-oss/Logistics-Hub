@@ -87,11 +87,6 @@ function getNavItems(role: string): NavItem[] {
   }
 
   if (role === "admin") {
-    items.push({
-      name: "Bank Accounts",
-      href: "/admin/bank-accounts",
-      icon: CreditCard,
-    });
     items.push({ name: "Users", href: "/admin/users", icon: Users });
     items.push({
       name: "Audit Logs",

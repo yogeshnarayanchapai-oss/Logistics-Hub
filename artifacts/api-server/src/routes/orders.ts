@@ -48,7 +48,7 @@ async function checkDuplicate(order: { customerPhone: string; customerName: stri
   return null;
 }
 
-async function formatOrder(o: typeof ordersTable.$inferSelect) {
+async function formatOrder(o: typeof ordersTable.$inferSelect, viewerVendorId?: number) {
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, o.vendorId));
   let riderName: string | null = null;
   if (o.riderId) {
@@ -60,6 +60,30 @@ async function formatOrder(o: typeof ordersTable.$inferSelect) {
     const [station] = await db.select().from(stationsTable).where(eq(stationsTable.id, o.stationId));
     stationName = station?.name ?? null;
   }
+
+  // For vendor viewers: only show duplicate info if the matched order is within the same vendor
+  let duplicateFlag = o.duplicateFlag;
+  let duplicateReason = o.duplicateReason;
+  let matchedOrderId = o.matchedOrderId;
+  let duplicateConfidence = o.duplicateConfidence;
+  let status = o.status;
+
+  if (viewerVendorId && o.duplicateFlag) {
+    let isSameVendorDuplicate = false;
+    if (o.matchedOrderId) {
+      const [matchedOrder] = await db.select({ vendorId: ordersTable.vendorId })
+        .from(ordersTable).where(eq(ordersTable.id, o.matchedOrderId));
+      isSameVendorDuplicate = matchedOrder?.vendorId === viewerVendorId;
+    }
+    if (!isSameVendorDuplicate) {
+      duplicateFlag = false;
+      duplicateReason = null;
+      matchedOrderId = null;
+      duplicateConfidence = null;
+      if (status === "duplicate_flagged") status = "new";
+    }
+  }
+
   return {
     id: o.id,
     orderCode: o.orderCode,
@@ -86,11 +110,11 @@ async function formatOrder(o: typeof ordersTable.$inferSelect) {
     riderName,
     priority: o.priority,
     requestedDeliveryTime: o.requestedDeliveryTime,
-    status: o.status,
-    duplicateFlag: o.duplicateFlag,
-    duplicateReason: o.duplicateReason,
-    matchedOrderId: o.matchedOrderId,
-    duplicateConfidence: o.duplicateConfidence,
+    status,
+    duplicateFlag,
+    duplicateReason,
+    matchedOrderId,
+    duplicateConfidence,
     paymentReleaseStatus: o.paymentReleaseStatus,
     notes: o.notes,
     internalNote: o.internalNote,
@@ -107,11 +131,12 @@ router.get("/orders", requireAuth, async (req, res): Promise<void> => {
   const { status, vendorId, riderId, stationId, dateFrom, dateTo, search, duplicateOnly, page = "1", limit = "20" } = req.query as Record<string, string>;
 
   const conditions: any[] = [];
+  let viewerVendorId: number | undefined;
 
   // Vendor sees only their orders
   if (userRole === "vendor") {
     const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
-    if (vendor) conditions.push(eq(ordersTable.vendorId, vendor.id));
+    if (vendor) { conditions.push(eq(ordersTable.vendorId, vendor.id)); viewerVendorId = vendor.id; }
     else { res.json({ orders: [], total: 0, page: 1, limit: 20 }); return; }
   }
   // Rider sees only assigned orders
@@ -145,7 +170,7 @@ router.get("/orders", requireAuth, async (req, res): Promise<void> => {
     .orderBy(desc(ordersTable.createdAt))
     .limit(limitNum).offset(offset);
 
-  const formatted = await Promise.all(orders.map(formatOrder));
+  const formatted = await Promise.all(orders.map((o) => formatOrder(o, viewerVendorId)));
   res.json({ orders: formatted, total: Number(total), page: pageNum, limit: limitNum });
 });
 
@@ -335,9 +360,11 @@ router.get("/orders/:id", requireAuth, async (req, res): Promise<void> => {
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   // Vendor can only see their own orders
+  let viewerVendorId: number | undefined;
   if (userRole === "vendor") {
     const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
     if (!vendor || vendor.id !== order.vendorId) { res.status(403).json({ error: "Forbidden" }); return; }
+    viewerVendorId = vendor.id;
   }
   // Rider can only see assigned orders
   if (userRole === "rider") {
@@ -358,7 +385,7 @@ router.get("/orders/:id", requireAuth, async (req, res): Promise<void> => {
     return { id: h.id, orderId: h.orderId, status: h.status, changedBy: h.changedBy, changedByName: u?.name ?? "Unknown", note: h.note, createdAt: h.createdAt.toISOString() };
   }));
 
-  res.json({ order: await formatOrder(order), comments: commentUsers, statusHistory: historyFormatted });
+  res.json({ order: await formatOrder(order, viewerVendorId), comments: commentUsers, statusHistory: historyFormatted });
 });
 
 router.patch("/orders/:id", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {

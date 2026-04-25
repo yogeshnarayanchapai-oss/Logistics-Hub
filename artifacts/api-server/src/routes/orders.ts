@@ -471,9 +471,9 @@ router.post("/orders/:id/status", requireAuth, async (req, res): Promise<void> =
 
   const updateData: Record<string, unknown> = { status };
   if (status === "delivered") updateData.deliveredAt = new Date();
-  if (status === "followup" && followupDate) {
+  if ((status === "followup" || status === "reschedule") && followupDate) {
     updateData.followupDate = new Date(followupDate);
-  } else if (status !== "followup") {
+  } else if (status !== "followup" && status !== "reschedule") {
     updateData.followupDate = null;
   }
 

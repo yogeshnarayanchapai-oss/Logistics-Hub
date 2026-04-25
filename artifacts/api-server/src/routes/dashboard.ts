@@ -257,7 +257,7 @@ router.get("/dashboard/rider-followups", requireAuth, async (req, res): Promise<
   const orders = await db.select().from(ordersTable)
     .where(and(
       eq(ordersTable.riderId, rider.id),
-      eq(ordersTable.status, "followup"),
+      inArray(ordersTable.status, ["followup", "reschedule"]),
       isNotNull(ordersTable.followupDate),
       gte(ordersTable.followupDate, today),
       lt(ordersTable.followupDate, tomorrow),
@@ -275,6 +275,33 @@ router.get("/dashboard/rider-followups", requireAuth, async (req, res): Promise<
     followupDate: o.followupDate ? o.followupDate.toISOString() : null,
     codAmount: Number(o.codAmount),
     productName: o.productName,
+    status: o.status,
+  })));
+});
+
+router.get("/dashboard/rider-today-orders", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).userId as number;
+  const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.userId, userId));
+  if (!rider) { res.status(404).json({ error: "Rider not found" }); return; }
+
+  const orders = await db.select().from(ordersTable)
+    .where(and(
+      eq(ordersTable.riderId, rider.id),
+      inArray(ordersTable.status, ["assigned", "confirmed", "picked_for_delivery", "out_for_delivery"]),
+    ))
+    .orderBy(desc(ordersTable.createdAt));
+
+  res.json(orders.map((o) => ({
+    id: o.id,
+    orderCode: o.orderCode,
+    customerName: o.customerName,
+    customerPhone: o.customerPhone,
+    address: o.address,
+    area: o.area,
+    city: o.city,
+    codAmount: Number(o.codAmount),
+    productName: o.productName,
+    status: o.status,
   })));
 });
 

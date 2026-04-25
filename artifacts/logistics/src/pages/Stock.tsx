@@ -248,10 +248,10 @@ export default function Stock() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="inventory"><Package className="mr-1.5 h-4 w-4" /> Inventory</TabsTrigger>
-          <TabsTrigger value="movements"><History className="mr-1.5 h-4 w-4" /> Movements</TabsTrigger>
           {canManage && !isVendor && (
             <TabsTrigger value="rider-inventory"><Truck className="mr-1.5 h-4 w-4" /> Rider Inventory</TabsTrigger>
           )}
+          <TabsTrigger value="movements"><History className="mr-1.5 h-4 w-4" /> Movements</TabsTrigger>
         </TabsList>
 
         <TabsContent value="inventory" className="mt-4">

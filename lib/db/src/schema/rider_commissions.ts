@@ -9,6 +9,7 @@ export const riderCommissionsTable = pgTable("rider_commissions", {
   orderCode: text("order_code"),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("earned"),
+  paymentRequestId: integer("payment_request_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

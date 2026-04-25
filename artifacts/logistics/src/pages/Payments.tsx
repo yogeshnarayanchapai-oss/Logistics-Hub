@@ -1094,6 +1094,55 @@ export default function Payments() {
                 </div>
               )}
 
+              {/* Commission Breakdown */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                  <Package className="h-3.5 w-3.5" /> Commission Breakdown
+                  {viewingRiderPayment.commissions?.length > 0 && (
+                    <span className="ml-1 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-xs font-bold">{viewingRiderPayment.commissions.length}</span>
+                  )}
+                </p>
+                {!viewingRiderPayment.commissions?.length ? (
+                  <p className="text-sm text-muted-foreground text-center py-3 border rounded-md">No commission records linked to this request.</p>
+                ) : (
+                  <div className="rounded-md border overflow-hidden">
+                    <div className="max-h-[200px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs py-2">Order</TableHead>
+                            <TableHead className="text-xs py-2">Customer</TableHead>
+                            <TableHead className="text-xs py-2 text-right">Commission</TableHead>
+                            <TableHead className="text-xs py-2">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {viewingRiderPayment.commissions.map((c: any) => (
+                            <TableRow key={c.id} className="text-sm">
+                              <TableCell className="py-1.5 font-mono text-xs text-primary">{c.orderCode}</TableCell>
+                              <TableCell className="py-1.5 text-xs truncate max-w-[100px]">{c.customerName}</TableCell>
+                              <TableCell className="py-1.5 text-right font-semibold">Rs. {c.amount.toLocaleString()}</TableCell>
+                              <TableCell className="py-1.5">
+                                <Badge variant="outline" className={`text-xs ${c.status === "paid" ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"}`}>
+                                  {c.status === "paid" ? <CheckCircle className="mr-1 h-2.5 w-2.5" /> : null}
+                                  {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="border-t bg-muted/30 px-3 py-2 flex justify-between text-sm">
+                      <span className="text-muted-foreground">{viewingRiderPayment.commissions.length} order{viewingRiderPayment.commissions.length !== 1 ? "s" : ""}</span>
+                      <span className="font-bold text-primary">
+                        Total: Rs. {viewingRiderPayment.commissions.reduce((s: number, c: any) => s + c.amount, 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {viewingRiderPayment.status === "released" && (viewingRiderPayment.referenceId || viewingRiderPayment.releaseNote) && (
                 <div className="rounded-lg border bg-emerald-50 border-emerald-100 px-3 py-2 text-sm text-emerald-800 space-y-1">
                   {viewingRiderPayment.referenceId && <div><span className="font-medium">Ref:</span> {viewingRiderPayment.referenceId}</div>}

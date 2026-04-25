@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
-import { db, riderPaymentRequestsTable, ridersTable, riderBankAccountsTable, riderCommissionsTable } from "@workspace/db";
+import { eq, and, desc, isNull } from "drizzle-orm";
+import { db, riderPaymentRequestsTable, ridersTable, riderBankAccountsTable, riderCommissionsTable, ordersTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { createNotification } from "../lib/notifications";
 
@@ -9,6 +9,22 @@ const router: IRouter = Router();
 async function formatRequest(r: typeof riderPaymentRequestsTable.$inferSelect) {
   const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.id, r.riderId));
   const [bank] = r.bankAccountId ? await db.select().from(riderBankAccountsTable).where(eq(riderBankAccountsTable.id, r.bankAccountId)) : [null];
+
+  const commissions = await db
+    .select({
+      id: riderCommissionsTable.id,
+      orderId: riderCommissionsTable.orderId,
+      orderCode: riderCommissionsTable.orderCode,
+      amount: riderCommissionsTable.amount,
+      status: riderCommissionsTable.status,
+      createdAt: riderCommissionsTable.createdAt,
+      customerName: ordersTable.customerName,
+      productName: ordersTable.productName,
+    })
+    .from(riderCommissionsTable)
+    .leftJoin(ordersTable, eq(ordersTable.id, riderCommissionsTable.orderId))
+    .where(eq(riderCommissionsTable.paymentRequestId, r.id));
+
   return {
     id: r.id,
     riderId: r.riderId,
@@ -26,6 +42,16 @@ async function formatRequest(r: typeof riderPaymentRequestsTable.$inferSelect) {
     referenceId: r.referenceId,
     paymentDate: r.paymentDate,
     reviewedBy: r.reviewedBy,
+    commissions: commissions.map(c => ({
+      id: c.id,
+      orderId: c.orderId,
+      orderCode: c.orderCode ?? `#${c.orderId}`,
+      amount: Number(c.amount),
+      status: c.status,
+      customerName: c.customerName ?? "—",
+      productName: c.productName ?? "—",
+      createdAt: c.createdAt.toISOString(),
+    })),
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -88,6 +114,16 @@ router.post("/rider-payment-requests", requireAuth, async (req, res): Promise<vo
     note: note || null,
   }).returning();
 
+  // Link all unlinked "earned" commissions for this rider to this payment request
+  await db
+    .update(riderCommissionsTable)
+    .set({ paymentRequestId: request.id })
+    .where(and(
+      eq(riderCommissionsTable.riderId, targetRiderId),
+      eq(riderCommissionsTable.status, "earned"),
+      isNull(riderCommissionsTable.paymentRequestId)
+    ));
+
   res.status(201).json(await formatRequest(request));
 });
 
@@ -109,6 +145,14 @@ router.patch("/rider-payment-requests/:id", requireAuth, requireRole("admin", "m
 
   const [updated] = await db.update(riderPaymentRequestsTable).set(updateData).where(eq(riderPaymentRequestsTable.id, id)).returning();
   if (!updated) { res.status(404).json({ error: "Request not found" }); return; }
+
+  // Mark linked commissions as paid when released
+  if (status === "released") {
+    await db
+      .update(riderCommissionsTable)
+      .set({ status: "paid" })
+      .where(eq(riderCommissionsTable.paymentRequestId, id));
+  }
 
   // Notify the rider
   const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.id, updated.riderId));

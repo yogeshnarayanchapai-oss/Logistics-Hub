@@ -39,6 +39,7 @@ function AssignButton({
 }) {
   const [open, setOpen] = useState(false);
   const [selectedRider, setSelectedRider] = useState<string>("");
+  const [riderSearch, setRiderSearch] = useState("");
   const { toast } = useToast();
 
   const { data: riders } = useListRiders({ status: "active" });
@@ -57,9 +58,11 @@ function AssignButton({
     },
   });
 
-  // Split riders into suggested (coverage match) and rest
+  // Split riders into suggested (coverage match) and rest, filtered by search
+  const searchQ = riderSearch.trim().toLowerCase();
   const { suggested, rest } = (riders ?? []).reduce(
     (acc, r) => {
+      if (searchQ && !r.name.toLowerCase().includes(searchQ) && !(r.stationName ?? "").toLowerCase().includes(searchQ)) return acc;
       if (matchesCoverage((r as any).coverageArea, orderLocation)) {
         acc.suggested.push(r);
       } else {
@@ -73,7 +76,7 @@ function AssignButton({
   const suggestedIds = new Set((suggested ?? []).map(r => r.id));
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setRiderSearch(""); setSelectedRider(""); } }}>
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="gap-1.5">
           <UserCheck className="h-3.5 w-3.5" />
@@ -97,6 +100,24 @@ function AssignButton({
               <span className="truncate">{orderLocation}</span>
             </div>
           )}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search rider..."
+              value={riderSearch}
+              onChange={e => setRiderSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+              autoComplete="off"
+            />
+            {riderSearch && (
+              <button
+                onClick={() => setRiderSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <Select value={selectedRider} onValueChange={setSelectedRider}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a rider..." />

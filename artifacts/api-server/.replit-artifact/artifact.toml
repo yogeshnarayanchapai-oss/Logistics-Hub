@@ -14,11 +14,7 @@ run = "pnpm --filter @workspace/api-server run dev"
 
 [services.production]
 build = "pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build && PORT=3000 BASE_PATH=/ pnpm --filter @workspace/logistics run build"
-run = "node --enable-source-maps artifacts/api-server/dist/index.mjs"
-
-[services.production.env]
-NODE_ENV = "production"
-PORT = "8080"
+run = "NODE_ENV=production PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs"
 
 [services.production.health.startup]
 path = "/api/healthz"

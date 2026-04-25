@@ -34,20 +34,18 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use("/api", router);
 
-// In production, serve the built frontend and handle SPA routing
-if (process.env.NODE_ENV === "production") {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  // Compiled file is at artifacts/api-server/dist/app.js — go up 3 levels to workspace root
-  const staticDir = path.resolve(__dirname, "../../../artifacts/logistics/dist/public");
-  logger.info({ staticDir, exists: existsSync(staticDir) }, "Static files check");
-  if (existsSync(staticDir)) {
-    app.use(express.static(staticDir));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(staticDir, "index.html"));
-    });
-  } else {
-    logger.error({ staticDir }, "Frontend static files not found — frontend will not be served");
-  }
+// Serve the built frontend if available (production deployment)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Compiled file lives at artifacts/api-server/dist/ — 3 levels up = workspace root
+const staticDir = path.resolve(__dirname, "../../../artifacts/logistics/dist/public");
+logger.info({ staticDir, exists: existsSync(staticDir), NODE_ENV: process.env.NODE_ENV }, "Static files check");
+if (existsSync(staticDir)) {
+  app.use(express.static(staticDir));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(staticDir, "index.html"));
+  });
+} else {
+  logger.warn({ staticDir }, "Frontend dist not found — skipping static file serving");
 }
 
 export default app;

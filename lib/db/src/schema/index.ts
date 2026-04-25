@@ -17,3 +17,4 @@ export * from "./rider_inventory";
 export * from "./rider_commissions";
 export * from "./rider_bank_accounts";
 export * from "./rider_payment_requests";
+export * from "./stock_movements";

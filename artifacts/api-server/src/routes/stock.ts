@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, sql } from "drizzle-orm";
-import { db, stockTable, vendorsTable } from "@workspace/db";
+import { db, stockTable, vendorsTable, stockMovementsTable, usersTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -22,6 +22,32 @@ async function formatStock(s: typeof stockTable.$inferSelect) {
     currentStock,
     updatedAt: s.updatedAt.toISOString(),
   };
+}
+
+async function logMovement(opts: {
+  stockId: number;
+  productName: string;
+  vendorId: number;
+  movementType: string;
+  qty: number;
+  riderId?: number | null;
+  riderName?: string | null;
+  note?: string | null;
+  performedByUserId?: number | null;
+  performedByName?: string | null;
+}) {
+  await db.insert(stockMovementsTable).values({
+    stockId: opts.stockId,
+    productName: opts.productName,
+    vendorId: opts.vendorId,
+    movementType: opts.movementType,
+    qty: opts.qty,
+    riderId: opts.riderId ?? null,
+    riderName: opts.riderName ?? null,
+    note: opts.note ?? null,
+    performedByUserId: opts.performedByUserId ?? null,
+    performedByName: opts.performedByName ?? null,
+  });
 }
 
 router.get("/stock", requireAuth, async (req, res): Promise<void> => {
@@ -56,7 +82,6 @@ router.post("/stock", requireAuth, requireRole("admin", "manager", "vendor"), as
 
   if (!productName) { res.status(400).json({ error: "productName required" }); return; }
 
-  // For vendors, auto-resolve their vendorId
   if (userRole === "vendor") {
     const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
     if (!vendor) { res.status(403).json({ error: "Vendor profile not found" }); return; }
@@ -65,6 +90,8 @@ router.post("/stock", requireAuth, requireRole("admin", "manager", "vendor"), as
 
   if (!vendorId) { res.status(400).json({ error: "vendorId required" }); return; }
 
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+
   const [s] = await db.insert(stockTable).values({
     vendorId: Number(vendorId),
     productName,
@@ -72,6 +99,16 @@ router.post("/stock", requireAuth, requireRole("admin", "manager", "vendor"), as
     openingStock: openingStock ?? 0,
     receivedStock: openingStock ?? 0,
   }).returning();
+
+  if ((openingStock ?? 0) > 0) {
+    await logMovement({
+      stockId: s.id, productName, vendorId: Number(vendorId),
+      movementType: "vendor_in", qty: openingStock ?? 0,
+      note: "Initial stock entry",
+      performedByUserId: userId, performedByName: user?.name ?? null,
+    });
+  }
+
   res.status(201).json(await formatStock(s));
 });
 
@@ -82,7 +119,6 @@ router.patch("/stock/:id", requireAuth, requireRole("admin", "manager", "vendor"
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
-  // Verify entry exists (and vendor can only touch their own)
   const [existing] = await db.select().from(stockTable).where(eq(stockTable.id, id));
   if (!existing) { res.status(404).json({ error: "Stock entry not found" }); return; }
 
@@ -93,10 +129,10 @@ router.patch("/stock/:id", requireAuth, requireRole("admin", "manager", "vendor"
     }
   }
 
-  const { type, qty, productName, productSku } = req.body;
+  const { type, qty, productName, productSku, note } = req.body;
   const quantity = Number(qty) || 0;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
 
-  // Allow updating product info
   if (productName !== undefined || productSku !== undefined) {
     const infoUpdates: any = {};
     if (productName) infoUpdates.productName = productName;
@@ -104,15 +140,26 @@ router.patch("/stock/:id", requireAuth, requireRole("admin", "manager", "vendor"
     await db.update(stockTable).set(infoUpdates).where(eq(stockTable.id, id));
   }
 
-  // Stock movements — always INCREMENT
   if (type === "in" && quantity > 0) {
     await db.update(stockTable)
       .set({ receivedStock: sql`${stockTable.receivedStock} + ${quantity}` })
       .where(eq(stockTable.id, id));
+    await logMovement({
+      stockId: id, productName: existing.productName, vendorId: existing.vendorId,
+      movementType: "vendor_in", qty: quantity,
+      note: note ?? null,
+      performedByUserId: userId, performedByName: user?.name ?? null,
+    });
   } else if (type === "out" && quantity > 0) {
     await db.update(stockTable)
       .set({ damagedStock: sql`${stockTable.damagedStock} + ${quantity}` })
       .where(eq(stockTable.id, id));
+    await logMovement({
+      stockId: id, productName: existing.productName, vendorId: existing.vendorId,
+      movementType: "stock_out", qty: quantity,
+      note: note ?? "Damaged / written off",
+      performedByUserId: userId, performedByName: user?.name ?? null,
+    });
   }
 
   const [updated] = await db.select().from(stockTable).where(eq(stockTable.id, id));

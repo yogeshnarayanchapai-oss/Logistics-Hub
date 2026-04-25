@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, riderInventoryTable, ridersTable, stockTable, usersTable } from "@workspace/db";
+import { db, riderInventoryTable, ridersTable, stockTable, usersTable, stockMovementsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -51,6 +51,7 @@ router.get("/rider-inventory", requireAuth, async (req, res): Promise<void> => {
 
 // POST /rider-inventory/assign — admin/manager assigns stock qty to a rider
 router.post("/rider-inventory/assign", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
+  const userId = (req as any).userId as number;
   const { riderId, stockId, qty, note } = req.body;
   if (!riderId || !stockId || !qty || qty <= 0) {
     res.status(400).json({ error: "riderId, stockId, and qty (> 0) are required" }); return;
@@ -59,7 +60,9 @@ router.post("/rider-inventory/assign", requireAuth, requireRole("admin", "manage
   const [stock] = await db.select().from(stockTable).where(eq(stockTable.id, parseInt(stockId, 10)));
   if (!stock) { res.status(404).json({ error: "Stock item not found" }); return; }
 
-  // Check if an entry already exists for this rider+stock
+  const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.id, parseInt(riderId, 10)));
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+
   const [existing] = await db.select().from(riderInventoryTable).where(
     and(
       eq(riderInventoryTable.riderId, parseInt(riderId, 10)),
@@ -67,8 +70,8 @@ router.post("/rider-inventory/assign", requireAuth, requireRole("admin", "manage
     )
   );
 
+  let entry;
   if (existing) {
-    // Increment assignedQty
     const [updated] = await db.update(riderInventoryTable)
       .set({
         assignedQty: sql`${riderInventoryTable.assignedQty} + ${parseInt(qty, 10)}`,
@@ -77,22 +80,38 @@ router.post("/rider-inventory/assign", requireAuth, requireRole("admin", "manage
       })
       .where(eq(riderInventoryTable.id, existing.id))
       .returning();
-    res.status(200).json(await formatEntry(updated));
+    entry = updated;
   } else {
-    const [entry] = await db.insert(riderInventoryTable).values({
+    const [inserted] = await db.insert(riderInventoryTable).values({
       riderId: parseInt(riderId, 10),
       stockId: parseInt(stockId, 10),
       productName: stock.productName,
       assignedQty: parseInt(qty, 10),
       note: note || null,
     }).returning();
-    res.status(201).json(await formatEntry(entry));
+    entry = inserted;
   }
+
+  await db.insert(stockMovementsTable).values({
+    stockId: parseInt(stockId, 10),
+    productName: stock.productName,
+    vendorId: stock.vendorId,
+    movementType: "rider_assign",
+    qty: parseInt(qty, 10),
+    riderId: parseInt(riderId, 10),
+    riderName: rider?.name ?? null,
+    note: note ?? null,
+    performedByUserId: userId,
+    performedByName: user?.name ?? null,
+  });
+
+  res.status(existing ? 200 : 201).json(await formatEntry(entry));
 });
 
 // POST /rider-inventory/return — admin/manager records a return from rider
 router.post("/rider-inventory/return", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
-  const { entryId, qty } = req.body;
+  const userId = (req as any).userId as number;
+  const { entryId, qty, note } = req.body;
   if (!entryId || !qty || qty <= 0) {
     res.status(400).json({ error: "entryId and qty (> 0) are required" }); return;
   }
@@ -108,6 +127,24 @@ router.post("/rider-inventory/return", requireAuth, requireRole("admin", "manage
     .set({ returnedQty: sql`${riderInventoryTable.returnedQty} + ${returnQty}` })
     .where(eq(riderInventoryTable.id, existing.id))
     .returning();
+
+  const [stock] = await db.select().from(stockTable).where(eq(stockTable.id, existing.stockId));
+  const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.id, existing.riderId));
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+
+  await db.insert(stockMovementsTable).values({
+    stockId: existing.stockId,
+    productName: existing.productName,
+    vendorId: stock?.vendorId ?? 0,
+    movementType: "rider_return",
+    qty: returnQty,
+    riderId: existing.riderId,
+    riderName: rider?.name ?? null,
+    note: note ?? null,
+    performedByUserId: userId,
+    performedByName: user?.name ?? null,
+  });
+
   res.json(await formatEntry(updated));
 });
 

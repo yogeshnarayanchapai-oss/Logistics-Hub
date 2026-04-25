@@ -15,13 +15,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, Package, Plus, Trash2, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, UserCheck, Undo2, Truck } from "lucide-react";
+import { Loader2, Search, Package, Plus, Trash2, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, UserCheck, Undo2, Truck, History, ArrowDown, ArrowUp, Filter } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format } from "date-fns";
 
 type DialogMode = "add-product" | "stock-in" | "stock-out" | "assign-inventory" | "return-inventory" | null;
 
@@ -68,6 +70,41 @@ export default function Stock() {
 
   const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
   const authToken = () => localStorage.getItem("auth_token");
+
+  // ── Movements tab state ──
+  const today = new Date().toISOString().split("T")[0];
+  const [movements, setMovements] = useState<any[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
+  const [mvDateFrom, setMvDateFrom] = useState(today);
+  const [mvDateTo, setMvDateTo] = useState(today);
+  const [mvType, setMvType] = useState("all");
+  const [mvVendorId, setMvVendorId] = useState("all");
+  const [activeTab, setActiveTab] = useState("inventory");
+
+  const fetchMovements = useCallback(() => {
+    setMovementsLoading(true);
+    const params = new URLSearchParams();
+    if (mvDateFrom) params.set("dateFrom", mvDateFrom);
+    if (mvDateTo) params.set("dateTo", mvDateTo);
+    if (mvType !== "all") params.set("movementType", mvType);
+    if (mvVendorId !== "all" && !isVendor) params.set("vendorId", mvVendorId);
+    if (isVendor && user?.vendorId) params.set("vendorId", String(user.vendorId));
+    fetch(`${BASE}/api/stock-movements?${params}`, { headers: { Authorization: `Bearer ${authToken()}` } })
+      .then(r => r.json()).then(d => setMovements(Array.isArray(d) ? d : []))
+      .catch(() => setMovements([]))
+      .finally(() => setMovementsLoading(false));
+  }, [mvDateFrom, mvDateTo, mvType, mvVendorId, isVendor]);
+
+  useEffect(() => {
+    if (activeTab === "movements") fetchMovements();
+  }, [activeTab, fetchMovements]);
+
+  const mvTypeLabel: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+    vendor_in:    { label: "Vendor In",     color: "bg-blue-50 text-blue-700 border-blue-200",   icon: <ArrowDown className="h-3 w-3 mr-1 text-blue-600" /> },
+    stock_out:    { label: "Out / Damaged", color: "bg-red-50 text-red-700 border-red-200",      icon: <ArrowUp className="h-3 w-3 mr-1 text-red-600" /> },
+    rider_assign: { label: "Rider Out",     color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Truck className="h-3 w-3 mr-1 text-amber-600" /> },
+    rider_return: { label: "Rider Return",  color: "bg-green-50 text-green-700 border-green-200", icon: <Undo2 className="h-3 w-3 mr-1 text-green-600" /> },
+  };
 
   const fetchRiderInventories = useCallback(() => {
     if (!canManage || isVendor) return;
@@ -208,6 +245,13 @@ export default function Stock() {
         )}
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="inventory"><Package className="mr-1.5 h-4 w-4" /> Inventory</TabsTrigger>
+          <TabsTrigger value="movements"><History className="mr-1.5 h-4 w-4" /> Movements</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inventory" className="mt-4">
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap gap-3 items-center">
@@ -334,6 +378,143 @@ export default function Stock() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* ── Movements Log Tab ── */}
+        <TabsContent value="movements" className="mt-4 space-y-4">
+          {/* Filters */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">From</Label>
+                  <Input type="date" value={mvDateFrom} onChange={e => setMvDateFrom(e.target.value)} className="w-[150px]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">To</Label>
+                  <Input type="date" value={mvDateTo} onChange={e => setMvDateTo(e.target.value)} className="w-[150px]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Type</Label>
+                  <Select value={mvType} onValueChange={setMvType}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="vendor_in">Vendor In</SelectItem>
+                      <SelectItem value="stock_out">Out / Damaged</SelectItem>
+                      <SelectItem value="rider_assign">Rider Out</SelectItem>
+                      <SelectItem value="rider_return">Rider Return</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!isVendor && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Vendor</Label>
+                    <Select value={mvVendorId} onValueChange={setMvVendorId}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="All Vendors" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Vendors</SelectItem>
+                        {vendors?.map(v => (
+                          <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <Button onClick={fetchMovements} disabled={movementsLoading} className="ml-auto">
+                  <Filter className="mr-2 h-4 w-4" />
+                  {movementsLoading ? "Loading..." : "Apply Filter"}
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+
+          {/* Movements Summary Badges */}
+          {!movementsLoading && movements.length > 0 && (() => {
+            const totals = movements.reduce((acc, m) => {
+              acc[m.movementType] = (acc[m.movementType] ?? 0) + m.qty;
+              return acc;
+            }, {} as Record<string, number>);
+            return (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(mvTypeLabel).map(([type, meta]) => totals[type] ? (
+                  <Badge key={type} variant="outline" className={`${meta.color} flex items-center gap-1 px-3 py-1 text-sm`}>
+                    {meta.icon} {meta.label}: <strong className="ml-1">{totals[type]}</strong> units
+                  </Badge>
+                ) : null)}
+              </div>
+            );
+          })()}
+
+          {/* Movements Table */}
+          <Card>
+            <CardContent className="p-0">
+              {movementsLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : movements.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
+                  <History className="h-10 w-10 mb-3 opacity-20" />
+                  <p className="text-sm">No movements found for the selected filters.</p>
+                  <p className="text-xs mt-1">Try widening the date range or changing filters.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date & Time</TableHead>
+                        <TableHead>Product</TableHead>
+                        {!isVendor && <TableHead>Vendor</TableHead>}
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead>Rider</TableHead>
+                        <TableHead>Note</TableHead>
+                        <TableHead>By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {movements.map(m => {
+                        const meta = mvTypeLabel[m.movementType];
+                        const isIn = m.movementType === "vendor_in" || m.movementType === "rider_return";
+                        return (
+                          <TableRow key={m.id}>
+                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                              {format(new Date(m.createdAt), "MMM d, yyyy")}
+                              <div className="text-xs">{format(new Date(m.createdAt), "h:mm a")}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-sm">{m.productName}</div>
+                            </TableCell>
+                            {!isVendor && <TableCell className="text-sm text-muted-foreground">{m.vendorName}</TableCell>}
+                            <TableCell>
+                              <Badge variant="outline" className={`flex items-center w-fit text-xs px-2 py-0.5 ${meta?.color ?? ""}`}>
+                                {meta?.icon}
+                                {meta?.label ?? m.movementType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-bold">
+                              <span className={isIn ? "text-green-700" : "text-red-600"}>
+                                {isIn ? "+" : "−"}{m.qty}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm">{m.riderName ?? "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{m.note ?? "—"}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{m.performedByName ?? "—"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Add Product Dialog */}
       <Dialog open={dialogMode === "add-product"} onOpenChange={(open) => !open && setDialogMode(null)}>

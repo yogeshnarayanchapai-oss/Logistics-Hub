@@ -18,6 +18,7 @@ import riderInventoryRouter from "./rider-inventory";
 import riderCommissionsRouter from "./rider-commissions";
 import riderBankAccountsRouter from "./rider-bank-accounts";
 import riderPaymentRequestsRouter from "./rider-payment-requests";
+import stockMovementsRouter from "./stock-movements";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(riderInventoryRouter);
 router.use(riderCommissionsRouter);
 router.use(riderBankAccountsRouter);
 router.use(riderPaymentRequestsRouter);
+router.use(stockMovementsRouter);
 
 export default router;

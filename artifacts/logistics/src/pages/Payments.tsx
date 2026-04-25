@@ -474,13 +474,14 @@ export default function Payments() {
                         <TableHead className="text-right">Requested</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Remarks</TableHead>
                         {!isVendor && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {payments?.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={isVendor ? 5 : 7} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
+                          <TableCell colSpan={isVendor ? 6 : 8} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
                         </TableRow>
                       ) : (
                         payments?.map((payment) => (
@@ -505,6 +506,11 @@ export default function Payments() {
                               } className={payment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
                                 {payment.status}
                               </Badge>
+                            </TableCell>
+                            <TableCell className="max-w-[160px]">
+                              {(payment as any).adminNote
+                                ? <span className="text-xs text-blue-700 line-clamp-2">{(payment as any).adminNote}</span>
+                                : <span className="text-xs text-muted-foreground">—</span>}
                             </TableCell>
                             {!isVendor && (
                               <TableCell className="text-right">

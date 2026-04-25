@@ -241,6 +241,7 @@ export default function RiderPayments() {
                         <TableHead>Status</TableHead>
                         <TableHead>Ref</TableHead>
                         <TableHead>Date</TableHead>
+                        <TableHead>Remarks</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -262,6 +263,11 @@ export default function RiderPayments() {
                             </TableCell>
                             <TableCell className="text-muted-foreground text-xs">{r.referenceId || "—"}</TableCell>
                             <TableCell className="text-muted-foreground text-sm">{format(new Date(r.createdAt), "dd MMM yyyy")}</TableCell>
+                            <TableCell className="max-w-[160px]">
+                              {(r as any).adminNote
+                                ? <span className="text-xs text-blue-700 line-clamp-2">{(r as any).adminNote}</span>
+                                : <span className="text-xs text-muted-foreground">—</span>}
+                            </TableCell>
                           </TableRow>
                         );
                       })}

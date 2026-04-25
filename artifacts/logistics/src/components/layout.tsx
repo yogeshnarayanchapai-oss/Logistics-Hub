@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth, getRoleHome } from "@/lib/auth";
+import { useListNotifications } from "@workspace/api-client-react";
 import {
   LayoutDashboard,
   Package,
@@ -37,13 +38,14 @@ interface NavItem {
   name: string;
   href: string;
   icon: any;
+  badgeTypes?: string[];
 }
 
 function getNavItems(role: string): NavItem[] {
   if (role === "vendor") {
     return [
       { name: "Dashboard", href: "/vendor/dashboard", icon: LayoutDashboard },
-      { name: "My Orders", href: "/vendor/orders", icon: Package },
+      { name: "My Orders", href: "/vendor/orders", icon: Package, badgeTypes: ["new_comment"] },
       { name: "Stock Inventory", href: "/vendor/stock", icon: Package },
       { name: "Payments", href: "/vendor/payments", icon: Wallet },
       { name: "My Reports", href: "/vendor/reports", icon: BarChart2 },
@@ -59,7 +61,7 @@ function getNavItems(role: string): NavItem[] {
   if (role === "rider") {
     return [
       { name: "Dashboard", href: "/rider/dashboard", icon: LayoutDashboard },
-      { name: "Orders", href: "/rider/orders", icon: Package },
+      { name: "Orders", href: "/rider/orders", icon: Package, badgeTypes: ["order_assigned", "new_comment"] },
       { name: "Support Tickets", href: "/rider/tickets", icon: Ticket },
     ];
   }
@@ -68,7 +70,7 @@ function getNavItems(role: string): NavItem[] {
   const items: NavItem[] = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Orders", href: "/admin/orders", icon: Package },
-    { name: "Assign Orders", href: "/admin/assign-orders", icon: UserCheck },
+    { name: "Assign Orders", href: "/admin/assign-orders", icon: UserCheck, badgeTypes: ["new_order"] },
     { name: "Duplicate Review", href: "/admin/duplicate-review", icon: Copy },
     { name: "Vendors", href: "/admin/vendors", icon: Building2 },
     { name: "Riders", href: "/admin/riders", icon: Truck },
@@ -111,6 +113,16 @@ export function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
 
+  const { data: unreadNotifications } = useListNotifications(
+    { unreadOnly: true },
+    { query: { refetchInterval: 30000, enabled: !!user } }
+  );
+
+  function getBadgeCount(types: string[]): number {
+    if (!unreadNotifications) return 0;
+    return unreadNotifications.filter((n) => types.includes(n.type)).length;
+  }
+
   if (!user) return <>{children}</>;
 
   const navItems = getNavItems(user.role);
@@ -148,6 +160,8 @@ export function Layout({ children }: LayoutProps) {
               ? "Staff"
               : user.role;
 
+  const totalUnread = unreadNotifications?.length ?? 0;
+
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
@@ -163,6 +177,7 @@ export function Layout({ children }: LayoutProps) {
           {navItems.map((item) => {
             const isActive =
               location === item.href || location.startsWith(item.href + "/");
+            const badgeCount = item.badgeTypes ? getBadgeCount(item.badgeTypes) : 0;
             return (
               <Link key={item.href} href={item.href}>
                 <Button
@@ -173,10 +188,15 @@ export function Layout({ children }: LayoutProps) {
                   )}
                 >
                   <item.icon
-                    className="mr-3 h-5 w-5 opacity-90"
+                    className="mr-3 h-5 w-5 opacity-90 shrink-0"
                     aria-hidden="true"
                   />
-                  {item.name}
+                  <span className="flex-1 text-left">{item.name}</span>
+                  {badgeCount > 0 && (
+                    <span className="ml-2 bg-white text-primary text-xs font-bold rounded-full h-5 min-w-[1.25rem] flex items-center justify-center px-1 leading-none">
+                      {badgeCount > 99 ? "99+" : badgeCount}
+                    </span>
+                  )}
                 </Button>
               </Link>
             );
@@ -214,6 +234,11 @@ export function Layout({ children }: LayoutProps) {
                 className="relative text-muted-foreground hover:text-foreground"
               >
                 <Bell className="h-5 w-5" />
+                {totalUnread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 min-w-4 flex items-center justify-center px-0.5 leading-none">
+                    {totalUnread > 99 ? "99+" : totalUnread}
+                  </span>
+                )}
               </Button>
             </Link>
 

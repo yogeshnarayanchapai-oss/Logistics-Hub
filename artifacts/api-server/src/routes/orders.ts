@@ -217,6 +217,20 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
 
   await createAuditLog({ userId, action: "create", entity: "order", entityId: order.id, description: `Created order ${order.orderCode}` });
 
+  // Notify all admins and managers about the new order
+  const adminUsers = await db.select().from(usersTable).where(
+    or(eq(usersTable.role, "admin"), eq(usersTable.role, "manager"))
+  );
+  for (const adminUser of adminUsers) {
+    await createNotification({
+      userId: adminUser.id,
+      title: "New Order Created",
+      message: `Order ${order.orderCode} created by ${vendor.name}`,
+      type: "new_order",
+      relatedId: order.id,
+    });
+  }
+
   res.status(201).json(await formatOrder(order));
 });
 
@@ -288,6 +302,23 @@ router.post("/orders/bulk", requireAuth, async (req, res): Promise<void> => {
     } catch (err) {
       errors.push({ rowIndex: i, field: "general", message: String(err) });
       failed++;
+    }
+  }
+
+  // Notify admins/managers about bulk order creation
+  if (created > 0) {
+    const [bulkVendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
+    const adminManagerUsers = await db.select().from(usersTable).where(
+      or(eq(usersTable.role, "admin"), eq(usersTable.role, "manager"))
+    );
+    for (const adminUser of adminManagerUsers) {
+      await createNotification({
+        userId: adminUser.id,
+        title: "Bulk Orders Created",
+        message: `${created} new order${created > 1 ? "s" : ""} created in bulk by ${bulkVendor?.name ?? "vendor"}`,
+        type: "new_order",
+        relatedId: undefined,
+      });
     }
   }
 
@@ -479,6 +510,42 @@ router.post("/orders/:orderId/comments", requireAuth, async (req, res): Promise<
     orderId, userId, content, visibility: visibility ?? "all",
   }).returning();
   const [u] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+
+  // Cross-party comment notifications
+  const [commentedOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  if (commentedOrder) {
+    const commenterRole = u?.role;
+    const snippet = content.length > 60 ? content.slice(0, 60) + "…" : content;
+
+    if (commenterRole === "rider") {
+      // Rider commenting → notify vendor
+      const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, commentedOrder.vendorId));
+      if (vendor?.userId) {
+        await createNotification({
+          userId: vendor.userId,
+          title: "New Comment from Rider",
+          message: `${u?.name ?? "Rider"} commented on order ${commentedOrder.orderCode}: "${snippet}"`,
+          type: "new_comment",
+          relatedId: orderId,
+        });
+      }
+    } else if (commenterRole === "vendor") {
+      // Vendor commenting → notify rider
+      if (commentedOrder.riderId) {
+        const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.id, commentedOrder.riderId));
+        if (rider?.userId) {
+          await createNotification({
+            userId: rider.userId,
+            title: "New Comment from Vendor",
+            message: `${u?.name ?? "Vendor"} commented on order ${commentedOrder.orderCode}: "${snippet}"`,
+            type: "new_comment",
+            relatedId: orderId,
+          });
+        }
+      }
+    }
+  }
+
   res.status(201).json({ id: comment.id, orderId: comment.orderId, userId: comment.userId, userName: u?.name ?? "Unknown", userRole: u?.role ?? "unknown", content: comment.content, visibility: comment.visibility, createdAt: comment.createdAt.toISOString() });
 });
 

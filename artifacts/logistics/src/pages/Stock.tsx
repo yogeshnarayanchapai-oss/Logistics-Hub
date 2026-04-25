@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, Package, Plus, Trash2, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, UserCheck, Undo2, Truck, History, ArrowDown, ArrowUp, Filter } from "lucide-react";
+import { Loader2, Search, Package, Plus, Trash2, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, UserCheck, UserMinus, Undo2, Truck, History, ArrowDown, ArrowUp, Filter } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -62,6 +62,12 @@ export default function Stock() {
   const [assignPending, setAssignPending] = useState(false);
   const [returnPending, setReturnPending] = useState(false);
   const [returnEntry, setReturnEntry] = useState<any>(null);
+
+  // Assign/Deassign combined dialog
+  const [assignDialogTab, setAssignDialogTab] = useState<"assign" | "deassign">("assign");
+  const [deassignRiderId, setDeassignRiderId] = useState<string>("");
+  const [deassignEntryId, setDeassignEntryId] = useState<string>("");
+  const [deassignQty, setDeassignQty] = useState<string>("");
 
   const { data: riders } = useListRiders({ status: "active" });
 
@@ -167,6 +173,30 @@ export default function Stock() {
     } finally { setReturnPending(false); }
   };
 
+  const handleDeassign = async () => {
+    if (!deassignEntryId || !deassignQty || Number(deassignQty) <= 0) {
+      toast({ title: "Select a product and enter a valid quantity", variant: "destructive" }); return;
+    }
+    setReturnPending(true);
+    try {
+      const res = await fetch(`${BASE}/api/rider-inventory/return`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
+        body: JSON.stringify({ entryId: Number(deassignEntryId), qty: Number(deassignQty) }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      toast({ title: "Inventory deassigned — stock returned to office" });
+      setDialogMode(null);
+      setDeassignRiderId("");
+      setDeassignEntryId("");
+      setDeassignQty("");
+      fetchRiderInventories();
+      queryClient.invalidateQueries({ queryKey: getListStockQueryKey() });
+    } catch (err: any) {
+      toast({ title: err.message || "Deassign failed", variant: "destructive" });
+    } finally { setReturnPending(false); }
+  };
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListStockQueryKey() });
 
   const createMutation = useCreateStockEntry({
@@ -235,8 +265,8 @@ export default function Stock() {
         </div>
         {canManage && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setDialogMode("assign-inventory")}>
-              <UserCheck className="mr-2 h-4 w-4" /> Assign Inventory
+            <Button variant="outline" onClick={() => { setAssignDialogTab("assign"); setDeassignRiderId(""); setDeassignEntryId(""); setDeassignQty(""); setDialogMode("assign-inventory"); }}>
+              <UserCheck className="mr-2 h-4 w-4" /> Assign / Deassign
             </Button>
             <Button onClick={() => { setActiveEntry(null); setDialogMode("add-product"); }}>
               <Plus className="mr-2 h-4 w-4" /> Add Product
@@ -717,54 +747,147 @@ export default function Stock() {
       </Dialog>
 
 
-      {/* Assign Inventory Dialog */}
+      {/* Assign / Deassign Inventory Dialog */}
       <Dialog open={dialogMode === "assign-inventory"} onOpenChange={(open) => !open && setDialogMode(null)}>
-        <DialogContent className="sm:max-w-[440px]">
-          <form onSubmit={handleAssignInventory}>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-primary">
-                <UserCheck className="h-5 w-5" /> Assign Inventory to Rider
-              </DialogTitle>
-              <DialogDescription>Select a rider and a product to assign stock for delivery.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="riderId">Rider *</Label>
-                <select name="riderId" id="riderId" required
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                  <option value="">— Select rider —</option>
-                  {(riders ?? []).map((r: any) => (
-                    <option key={r.id} value={r.id}>{r.name} ({r.phone})</option>
-                  ))}
-                </select>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {assignDialogTab === "assign"
+                ? <><UserCheck className="h-5 w-5 text-primary" /> Assign Inventory to Rider</>
+                : <><UserMinus className="h-5 w-5 text-orange-600" /> Deassign Inventory from Rider</>}
+            </DialogTitle>
+            <DialogDescription>
+              {assignDialogTab === "assign"
+                ? "Send stock from the office warehouse to a rider."
+                : "Return stock from a rider back to the office warehouse."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Tab switcher */}
+          <div className="flex rounded-lg border border-input overflow-hidden mb-1">
+            <button
+              type="button"
+              onClick={() => setAssignDialogTab("assign")}
+              className={`flex-1 py-2 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${assignDialogTab === "assign" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+            >
+              <UserCheck className="h-3.5 w-3.5" /> Assign
+            </button>
+            <button
+              type="button"
+              onClick={() => setAssignDialogTab("deassign")}
+              className={`flex-1 py-2 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${assignDialogTab === "deassign" ? "bg-orange-600 text-white" : "hover:bg-muted text-muted-foreground"}`}
+            >
+              <UserMinus className="h-3.5 w-3.5" /> Deassign
+            </button>
+          </div>
+
+          {assignDialogTab === "assign" ? (
+            <form onSubmit={handleAssignInventory}>
+              <div className="grid gap-4 py-3">
+                <div className="space-y-2">
+                  <Label htmlFor="riderId">Rider *</Label>
+                  <select name="riderId" id="riderId" required
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                    <option value="">— Select rider —</option>
+                    {(riders ?? []).map((r: any) => (
+                      <option key={r.id} value={r.id}>{r.name} ({r.phone})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stockId">Product *</Label>
+                  <select name="stockId" id="stockId" required
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                    <option value="">— Select product —</option>
+                    {(rawEntries ?? []).filter(e => e.currentStock > 0).map((e: any) => (
+                      <option key={e.id} value={e.id}>{e.productName} {e.productSku ? `(${e.productSku})` : ""} — {e.currentStock} in stock</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="qty">Quantity *</Label>
+                  <Input id="qty" name="qty" type="number" min="1" placeholder="e.g. 20" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="note">Note (optional)</Label>
+                  <Input id="note" name="note" placeholder="e.g. For Kathmandu route" />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="stockId">Product *</Label>
-                <select name="stockId" id="stockId" required
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                  <option value="">— Select product —</option>
-                  {(rawEntries ?? []).filter(e => e.currentStock > 0).map((e: any) => (
-                    <option key={e.id} value={e.id}>{e.productName} {e.productSku ? `(${e.productSku})` : ""} — {e.currentStock} in stock</option>
-                  ))}
-                </select>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
+                <Button type="submit" disabled={assignPending}>
+                  {assignPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Assign
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <div>
+              <div className="grid gap-4 py-3">
+                <div className="space-y-2">
+                  <Label>Rider *</Label>
+                  <select
+                    value={deassignRiderId}
+                    onChange={(e) => { setDeassignRiderId(e.target.value); setDeassignEntryId(""); setDeassignQty(""); }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">— Select rider —</option>
+                    {Array.from(new Map(riderInventories.filter(e => e.currentQty > 0).map(e => [e.riderId, e])).values()).map((e: any) => (
+                      <option key={e.riderId} value={e.riderId}>{e.riderName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {deassignRiderId && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Product *</Label>
+                      <select
+                        value={deassignEntryId}
+                        onChange={(e) => { setDeassignEntryId(e.target.value); setDeassignQty(""); }}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">— Select product —</option>
+                        {riderInventories.filter(e => String(e.riderId) === deassignRiderId && e.currentQty > 0).map((e: any) => (
+                          <option key={e.id} value={e.id}>{e.productName}{e.productSku ? ` (${e.productSku})` : ""} — {e.currentQty} in hand</option>
+                        ))}
+                      </select>
+                    </div>
+                    {deassignEntryId && (
+                      <div className="space-y-2">
+                        <Label>
+                          Quantity to Return *
+                          {(() => {
+                            const entry = riderInventories.find(e => String(e.id) === deassignEntryId);
+                            return entry ? <span className="text-muted-foreground font-normal"> (max {entry.currentQty})</span> : null;
+                          })()}
+                        </Label>
+                        <Input
+                          type="number" min="1"
+                          max={riderInventories.find(e => String(e.id) === deassignEntryId)?.currentQty ?? 9999}
+                          placeholder="e.g. 5"
+                          value={deassignQty}
+                          onChange={(e) => setDeassignQty(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="qty">Quantity *</Label>
-                <Input id="qty" name="qty" type="number" min="1" placeholder="e.g. 20" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="note">Note (optional)</Label>
-                <Input id="note" name="note" placeholder="e.g. For Kathmandu route" />
-              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
+                <Button
+                  type="button"
+                  className="bg-orange-600 hover:bg-orange-700"
+                  disabled={returnPending || !deassignEntryId || !deassignQty || Number(deassignQty) <= 0}
+                  onClick={handleDeassign}
+                >
+                  {returnPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Deassign
+                </Button>
+              </DialogFooter>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
-              <Button type="submit" disabled={assignPending}>
-                {assignPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Assign
-              </Button>
-            </DialogFooter>
-          </form>
+          )}
         </DialogContent>
       </Dialog>
 

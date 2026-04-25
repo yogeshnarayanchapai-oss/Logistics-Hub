@@ -495,17 +495,20 @@ router.post("/orders/:id/status", requireAuth, async (req, res): Promise<void> =
       await createNotification({ userId: vendor.userId, title: "Order Delivered", message: `Order ${order.orderCode} has been delivered`, type: "order_delivered", relatedId: id });
     }
 
-    // Auto-create commission for rider
+    // Auto-create commission for rider (guard against duplicate)
     if (order.riderId) {
-      const [riderData] = await db.select().from(ridersTable).where(eq(ridersTable.id, order.riderId));
-      if (riderData && Number(riderData.commissionRate ?? 0) > 0) {
-        await db.insert(riderCommissionsTable).values({
-          riderId: order.riderId,
-          orderId: id,
-          orderCode: order.orderCode,
-          amount: riderData.commissionRate!.toString(),
-          status: "earned",
-        });
+      const [existing] = await db.select().from(riderCommissionsTable).where(eq(riderCommissionsTable.orderId, id));
+      if (!existing) {
+        const [riderData] = await db.select().from(ridersTable).where(eq(ridersTable.id, order.riderId));
+        if (riderData && Number(riderData.commissionRate ?? 0) > 0) {
+          await db.insert(riderCommissionsTable).values({
+            riderId: order.riderId,
+            orderId: id,
+            orderCode: order.orderCode,
+            amount: riderData.commissionRate!.toString(),
+            status: "earned",
+          });
+        }
       }
     }
 

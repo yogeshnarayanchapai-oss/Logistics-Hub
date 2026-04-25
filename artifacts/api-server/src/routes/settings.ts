@@ -56,7 +56,14 @@ router.put("/settings/branding", requireAuth, requireRole("admin"), async (req, 
   res.json({ success: true });
 });
 
-const GENERAL_DEFAULTS = { rateMode: "default" as "default" | "custom", defaultDeliveryCharge: 100 };
+const GENERAL_DEFAULTS = {
+  companyName: "SwiftShip Logistics",
+  supportEmail: "support@swiftship.com",
+  autoAssign: true,
+  strictDuplicateCheck: true,
+  rateMode: "default" as "default" | "custom",
+  defaultDeliveryCharge: 100,
+};
 
 router.get("/settings/general", requireAuth, async (_req, res): Promise<void> => {
   const rows = await db.select().from(appSettingsTable).where(eq(appSettingsTable.key, "general"));
@@ -66,10 +73,14 @@ router.get("/settings/general", requireAuth, async (_req, res): Promise<void> =>
 });
 
 router.put("/settings/general", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const companyName = (req.body.companyName as string | undefined)?.trim() || "SwiftShip Logistics";
+  const supportEmail = (req.body.supportEmail as string | undefined)?.trim() || "support@swiftship.com";
+  const autoAssign = req.body.autoAssign !== false;
+  const strictDuplicateCheck = req.body.strictDuplicateCheck !== false;
   const rateMode: "default" | "custom" = req.body.rateMode === "custom" ? "custom" : "default";
   const defaultDeliveryCharge = Math.max(0, Number(req.body.defaultDeliveryCharge ?? 100));
 
-  const value = JSON.stringify({ rateMode, defaultDeliveryCharge });
+  const value = JSON.stringify({ companyName, supportEmail, autoAssign, strictDuplicateCheck, rateMode, defaultDeliveryCharge });
   await db.insert(appSettingsTable).values({ key: "general", value })
     .onConflictDoUpdate({ target: appSettingsTable.key, set: { value } });
 
@@ -77,7 +88,7 @@ router.put("/settings/general", requireAuth, requireRole("admin"), async (req, r
     await db.update(stationsTable).set({ deliveryCharge: defaultDeliveryCharge });
   }
 
-  res.json({ success: true, rateMode, defaultDeliveryCharge });
+  res.json({ success: true, companyName, supportEmail, autoAssign, strictDuplicateCheck, rateMode, defaultDeliveryCharge });
 });
 
 export default router;

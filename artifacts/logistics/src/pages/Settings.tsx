@@ -82,6 +82,10 @@ export default function Settings() {
   };
 
   // ── General settings state ──
+  const [genCompanyName, setGenCompanyName] = useState("SwiftShip Logistics");
+  const [genSupportEmail, setGenSupportEmail] = useState("support@swiftship.com");
+  const [autoAssign, setAutoAssign] = useState(true);
+  const [strictDuplicateCheck, setStrictDuplicateCheck] = useState(true);
   const [rateMode, setRateMode] = useState<"default" | "custom">("default");
   const [defaultDeliveryCharge, setDefaultDeliveryCharge] = useState(100);
   const [generalLoading, setGeneralLoading] = useState(true);
@@ -93,6 +97,10 @@ export default function Settings() {
     fetch(`${base}/api/settings/general`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => {
+        setGenCompanyName(d.companyName ?? "SwiftShip Logistics");
+        setGenSupportEmail(d.supportEmail ?? "support@swiftship.com");
+        setAutoAssign(d.autoAssign !== false);
+        setStrictDuplicateCheck(d.strictDuplicateCheck !== false);
         setRateMode(d.rateMode ?? "default");
         setDefaultDeliveryCharge(d.defaultDeliveryCharge ?? 100);
       })
@@ -108,7 +116,7 @@ export default function Settings() {
       const res = await fetch(`${base}/api/settings/general`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ rateMode, defaultDeliveryCharge }),
+        body: JSON.stringify({ companyName: genCompanyName, supportEmail: genSupportEmail, autoAssign, strictDuplicateCheck, rateMode, defaultDeliveryCharge }),
       });
       if (!res.ok) throw new Error();
       toast({
@@ -197,26 +205,45 @@ export default function Settings() {
                 <CardDescription>Basic system settings and defaults.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name</Label>
-                    <Input id="companyName" defaultValue="SwiftShip Logistics" />
+                {generalLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading...
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="supportEmail">Support Email</Label>
-                    <Input id="supportEmail" defaultValue="support@swiftship.com" type="email" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Default Currency</Label>
-                    <Input id="currency" defaultValue="NPR (Rs.)" disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Input id="timezone" defaultValue="Asia/Kathmandu" disabled />
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="companyName">Company Name</Label>
+                        <Input
+                          id="companyName"
+                          value={genCompanyName}
+                          onChange={(e) => setGenCompanyName(e.target.value)}
+                          placeholder="e.g. SwiftShip Logistics"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="supportEmail">Support Email</Label>
+                        <Input
+                          id="supportEmail"
+                          type="email"
+                          value={genSupportEmail}
+                          onChange={(e) => setGenSupportEmail(e.target.value)}
+                          placeholder="e.g. support@swiftship.com"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="currency">Default Currency</Label>
+                        <Input id="currency" defaultValue="NPR (Rs.)" disabled />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="timezone">Timezone</Label>
+                        <Input id="timezone" defaultValue="Asia/Kathmandu" disabled />
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -231,14 +258,14 @@ export default function Settings() {
                     <Label className="text-base">Auto-assign Orders</Label>
                     <p className="text-sm text-muted-foreground">Automatically route orders to stations based on area coverage.</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch checked={autoAssign} onCheckedChange={setAutoAssign} disabled={generalLoading} />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-base">Strict Duplicate Checking</Label>
                     <p className="text-sm text-muted-foreground">Flag orders with similar phone numbers within 48 hours.</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch checked={strictDuplicateCheck} onCheckedChange={setStrictDuplicateCheck} disabled={generalLoading} />
                 </div>
 
                 {/* ── Delivery Rate Mode ── */}

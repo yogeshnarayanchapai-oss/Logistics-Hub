@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useListPaymentRequests, useCreatePaymentRequest, useUpdatePaymentRequest, useGetCodSummary, useListBankAccounts, useCreateBankAccount, useUpdateBankAccount, getListPaymentRequestsQueryKey, getGetCodSummaryQueryKey, getListBankAccountsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,9 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil } from "lucide-react";
+import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil, Truck, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
 export default function Payments() {
@@ -151,6 +152,64 @@ export default function Payments() {
     setBankFormOpen(true);
   };
 
+  // ── Rider payment requests (admin/manager only) ──
+  const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+  const authToken = () => localStorage.getItem("auth_token");
+
+  const [riderPayments, setRiderPayments] = useState<any[]>([]);
+  const [riderPaymentsLoading, setRiderPaymentsLoading] = useState(false);
+  const [riderReleaseDialogOpen, setRiderReleaseDialogOpen] = useState(false);
+  const [selectedRiderPayment, setSelectedRiderPayment] = useState<any>(null);
+  const [riderActionType, setRiderActionType] = useState<"release" | "reject" | null>(null);
+  const [riderActionPending, setRiderActionPending] = useState(false);
+
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
+
+  const fetchRiderPayments = useCallback(() => {
+    if (!isAdmin) return;
+    setRiderPaymentsLoading(true);
+    fetch(`${BASE}/api/rider-payment-requests`, { headers: { Authorization: `Bearer ${authToken()}` } })
+      .then(r => r.json()).then(d => setRiderPayments(Array.isArray(d) ? d : []))
+      .catch(() => setRiderPayments([])).finally(() => setRiderPaymentsLoading(false));
+  }, [isAdmin]);
+
+  useEffect(() => { fetchRiderPayments(); }, [fetchRiderPayments]);
+
+  const handleRiderAction = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedRiderPayment || !riderActionType) return;
+    const fd = new FormData(e.currentTarget);
+    setRiderActionPending(true);
+    try {
+      const body: any = { status: riderActionType === "release" ? "released" : "rejected" };
+      if (riderActionType === "release") {
+        body.approvedAmount = fd.get("approvedAmount");
+        body.referenceId = fd.get("referenceId");
+        body.paymentDate = fd.get("paymentDate");
+        body.releaseNote = fd.get("releaseNote");
+      }
+      const res = await fetch(`${BASE}/api/rider-payment-requests/${selectedRiderPayment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      toast({ title: riderActionType === "release" ? "Payment released to rider" : "Request rejected" });
+      setRiderReleaseDialogOpen(false);
+      setSelectedRiderPayment(null);
+      setRiderActionType(null);
+      fetchRiderPayments();
+    } catch (err: any) {
+      toast({ title: err.message || "Action failed", variant: "destructive" });
+    } finally { setRiderActionPending(false); }
+  };
+
+  const riderPaymentStatusColor: Record<string, string> = {
+    pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    released: "bg-green-100 text-green-700 border-green-300",
+    rejected: "bg-red-100 text-red-700 border-red-300",
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -278,6 +337,137 @@ export default function Payments() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Rider Commission Payments (Admin/Manager) ── */}
+      {isAdmin && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Truck className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold">Rider Commission Payments</h3>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {riderPaymentsLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+              ) : riderPayments.length === 0 ? (
+                <div className="flex flex-col items-center py-12 text-muted-foreground">
+                  <Truck className="h-10 w-10 mb-2 opacity-20" />
+                  <p>No rider payment requests yet.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Rider</TableHead>
+                        <TableHead>Bank</TableHead>
+                        <TableHead className="text-right">Requested</TableHead>
+                        <TableHead className="text-right">Approved</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Ref / Date</TableHead>
+                        <TableHead>Requested On</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {riderPayments.map(rp => (
+                        <TableRow key={rp.id}>
+                          <TableCell>
+                            <div className="font-medium">{rp.riderName}</div>
+                            <div className="text-xs text-muted-foreground">{rp.riderEmail}</div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div>{rp.bankName}</div>
+                            <div className="text-muted-foreground text-xs">{rp.accountNumber}</div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">Rs. {rp.requestedAmount.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{rp.approvedAmount ? `Rs. ${rp.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={riderPaymentStatusColor[rp.status] ?? ""}>
+                              {rp.status === "released" && <CheckCircle className="mr-1 h-3 w-3" />}
+                              {rp.status === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
+                              {rp.status.charAt(0).toUpperCase() + rp.status.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {rp.referenceId ? <div>Ref: {rp.referenceId}</div> : "—"}
+                            {rp.paymentDate && <div className="text-xs">{rp.paymentDate}</div>}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{format(new Date(rp.createdAt), "MMM d, yyyy")}</TableCell>
+                          <TableCell className="text-right">
+                            {rp.status === "pending" && (
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
+                                  onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
+                                  Reject
+                                </Button>
+                                <Button size="sm"
+                                  onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
+                                  Release
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Rider Payment Release/Reject Dialog */}
+      <Dialog open={riderReleaseDialogOpen} onOpenChange={open => { if (!open) { setRiderReleaseDialogOpen(false); setSelectedRiderPayment(null); setRiderActionType(null); } }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <form onSubmit={handleRiderAction}>
+            <DialogHeader>
+              <DialogTitle className={riderActionType === "release" ? "text-primary" : "text-red-600"}>
+                {riderActionType === "release" ? "Release Commission Payment" : "Reject Payment Request"}
+              </DialogTitle>
+              <DialogDescription>
+                Rider: <strong>{selectedRiderPayment?.riderName}</strong> — Requested: <strong>Rs. {selectedRiderPayment?.requestedAmount?.toLocaleString()}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {riderActionType === "release" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Approved Amount (Rs.) *</Label>
+                    <Input name="approvedAmount" type="number" defaultValue={selectedRiderPayment?.requestedAmount} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bank Reference / Txn ID *</Label>
+                    <Input name="referenceId" required placeholder="e.g. NPSF2024123456" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Transfer Date *</Label>
+                    <Input name="paymentDate" type="date" defaultValue={new Date().toISOString().split("T")[0]} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Note (optional)</Label>
+                    <Input name="releaseNote" placeholder="Optional note to rider" />
+                  </div>
+                </>
+              )}
+              {riderActionType === "reject" && (
+                <div className="rounded-md bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-700">
+                  This will reject the rider's payment request. They will be notified.
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setRiderReleaseDialogOpen(false); setSelectedRiderPayment(null); setRiderActionType(null); }}>Cancel</Button>
+              <Button type="submit" variant={riderActionType === "reject" ? "destructive" : "default"} disabled={riderActionPending}>
+                {riderActionPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {riderActionType === "release" ? "Confirm Release" : "Reject Request"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Vendor Request Payment Dialog */}
       <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>

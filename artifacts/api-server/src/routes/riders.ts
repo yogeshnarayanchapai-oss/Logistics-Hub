@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, count, sql } from "drizzle-orm";
-import { db, ridersTable, stationsTable, ordersTable, usersTable } from "@workspace/db";
+import { eq, ilike, and, count, sql, sum } from "drizzle-orm";
+import { db, ridersTable, stationsTable, ordersTable, usersTable, riderCommissionsTable, riderPaymentRequestsTable } from "@workspace/db";
 import { requireAuth, requireRole, hashPassword } from "../lib/auth";
 import { createAuditLog } from "../lib/audit";
 
@@ -22,6 +22,9 @@ async function formatRider(r: typeof ridersTable.$inferSelect) {
     .where(and(eq(ordersTable.riderId, r.id), eq(ordersTable.status, "delivered"),
       sql`${ordersTable.deliveredAt} >= ${today.toISOString()}`));
 
+  const [totalEarned] = await db.select({ v: sum(riderCommissionsTable.amount) }).from(riderCommissionsTable).where(eq(riderCommissionsTable.riderId, r.id));
+  const [totalReleased] = await db.select({ v: sum(riderPaymentRequestsTable.approvedAmount) }).from(riderPaymentRequestsTable).where(and(eq(riderPaymentRequestsTable.riderId, r.id), eq(riderPaymentRequestsTable.status, "released")));
+
   return {
     id: r.id,
     name: r.name,
@@ -32,9 +35,13 @@ async function formatRider(r: typeof ridersTable.$inferSelect) {
     stationName,
     status: r.status,
     coverageArea: r.coverageArea ?? null,
+    commissionRate: Number(r.commissionRate ?? 0),
     userId: r.userId,
     assignedCount: Number(assignedResult.count),
     deliveredToday: Number(deliveredResult.count),
+    totalCommissionEarned: Number(totalEarned?.v ?? 0),
+    totalCommissionReleased: Number(totalReleased?.v ?? 0),
+    pendingCommission: Number(totalEarned?.v ?? 0) - Number(totalReleased?.v ?? 0),
     createdAt: r.createdAt.toISOString(),
   };
 }
@@ -54,7 +61,7 @@ router.get("/riders", requireAuth, async (req, res): Promise<void> => {
 
 router.post("/riders", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const actorId = (req as any).userId as number;
-  const { name, email, phone, vehicleNumber, stationId, password, coverageArea } = req.body;
+  const { name, email, phone, vehicleNumber, stationId, password, coverageArea, commissionRate } = req.body;
   if (!name || !email) { res.status(400).json({ error: "name and email required" }); return; }
 
   // Check if a user already exists with this email
@@ -87,6 +94,7 @@ router.post("/riders", requireAuth, requireRole("admin", "manager"), async (req,
     name, email, phone, vehicleNumber,
     stationId: stationId ?? null,
     coverageArea: coverageArea || null,
+    commissionRate: commissionRate ? commissionRate.toString() : "0",
     userId: linkedUserId,
   }).returning();
 
@@ -108,7 +116,7 @@ router.patch("/riders/:id", requireAuth, requireRole("admin", "manager"), async 
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const updates: Record<string, unknown> = {};
-  const { name, email, phone, vehicleNumber, stationId, status, coverageArea } = req.body;
+  const { name, email, phone, vehicleNumber, stationId, status, coverageArea, commissionRate } = req.body;
   if (name) updates.name = name;
   if (email) updates.email = email;
   if (phone !== undefined) updates.phone = phone;
@@ -116,6 +124,7 @@ router.patch("/riders/:id", requireAuth, requireRole("admin", "manager"), async 
   if (stationId !== undefined) updates.stationId = stationId;
   if (status) updates.status = status;
   if (coverageArea !== undefined) updates.coverageArea = coverageArea || null;
+  if (commissionRate !== undefined) updates.commissionRate = commissionRate.toString();
   const [rider] = await db.update(ridersTable).set(updates as any).where(eq(ridersTable.id, id)).returning();
   if (!rider) { res.status(404).json({ error: "Rider not found" }); return; }
 

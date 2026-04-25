@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, or, sql, count, desc, gte, lte } from "drizzle-orm";
-import { db, ordersTable, vendorsTable, ridersTable, stationsTable, orderCommentsTable, orderStatusHistoryTable, usersTable, notificationsTable, riderInventoryTable, stockTable } from "@workspace/db";
+import { db, ordersTable, vendorsTable, ridersTable, stationsTable, orderCommentsTable, orderStatusHistoryTable, usersTable, notificationsTable, riderInventoryTable, riderCommissionsTable, stockTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { createAuditLog } from "../lib/audit";
 import { createNotification } from "../lib/notifications";
@@ -493,6 +493,20 @@ router.post("/orders/:id/status", requireAuth, async (req, res): Promise<void> =
     const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, order.vendorId));
     if (vendor?.userId) {
       await createNotification({ userId: vendor.userId, title: "Order Delivered", message: `Order ${order.orderCode} has been delivered`, type: "order_delivered", relatedId: id });
+    }
+
+    // Auto-create commission for rider
+    if (order.riderId) {
+      const [riderData] = await db.select().from(ridersTable).where(eq(ridersTable.id, order.riderId));
+      if (riderData && Number(riderData.commissionRate ?? 0) > 0) {
+        await db.insert(riderCommissionsTable).values({
+          riderId: order.riderId,
+          orderId: id,
+          orderCode: order.orderCode,
+          amount: riderData.commissionRate!.toString(),
+          status: "earned",
+        });
+      }
     }
 
     // Auto-deduct from rider inventory: match by rider + productName/SKU

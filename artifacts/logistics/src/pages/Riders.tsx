@@ -268,6 +268,15 @@ export default function Riders() {
                 )}
               </div>
               <div className="space-y-2">
+                <Label htmlFor="commissionRate">Commission per Delivery (Rs.)</Label>
+                <Input
+                  id="commissionRate" name="commissionRate" type="number" min="0" step="0.01"
+                  defaultValue={editingRider?.commissionRate ?? 0}
+                  placeholder="e.g. 50"
+                />
+                <p className="text-xs text-muted-foreground">Amount earned by the rider per successful delivery.</p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="coverageArea">Coverage Area</Label>
                 <textarea
                   id="coverageArea"

@@ -14,3 +14,6 @@ export * from "./audit_logs";
 export * from "./support_contacts";
 export * from "./app_settings";
 export * from "./rider_inventory";
+export * from "./rider_commissions";
+export * from "./rider_bank_accounts";
+export * from "./rider_payment_requests";

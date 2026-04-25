@@ -15,6 +15,9 @@ import dashboardRouter from "./dashboard";
 import supportContactsRouter from "./support_contacts";
 import settingsRouter from "./settings";
 import riderInventoryRouter from "./rider-inventory";
+import riderCommissionsRouter from "./rider-commissions";
+import riderBankAccountsRouter from "./rider-bank-accounts";
+import riderPaymentRequestsRouter from "./rider-payment-requests";
 
 const router: IRouter = Router();
 
@@ -34,5 +37,8 @@ router.use(dashboardRouter);
 router.use(supportContactsRouter);
 router.use(settingsRouter);
 router.use(riderInventoryRouter);
+router.use(riderCommissionsRouter);
+router.use(riderBankAccountsRouter);
+router.use(riderPaymentRequestsRouter);
 
 export default router;

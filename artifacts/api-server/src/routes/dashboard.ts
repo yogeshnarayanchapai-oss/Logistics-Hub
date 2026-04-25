@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count, sum, sql, desc, gte, lt, inArray, lte, isNotNull } from "drizzle-orm";
-import { db, ordersTable, vendorsTable, ridersTable, ticketsTable, paymentRequestsTable, stationsTable, usersTable, orderCommentsTable } from "@workspace/db";
+import { db, ordersTable, vendorsTable, ridersTable, ticketsTable, paymentRequestsTable, riderCommissionsTable, riderPaymentRequestsTable, stationsTable, usersTable, orderCommentsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -224,6 +224,13 @@ router.get("/dashboard/rider-summary", requireAuth, async (req, res): Promise<vo
   const [total] = await db.select({ count: count() }).from(ordersTable)
     .where(and(eq(ordersTable.riderId, rider.id), eq(ordersTable.status, "delivered")));
 
+  const [totalEarned] = await db.select({ v: sum(riderCommissionsTable.amount) }).from(riderCommissionsTable)
+    .where(eq(riderCommissionsTable.riderId, rider.id));
+  const [todayEarned] = await db.select({ v: sum(riderCommissionsTable.amount) }).from(riderCommissionsTable)
+    .where(and(eq(riderCommissionsTable.riderId, rider.id), gte(riderCommissionsTable.createdAt, today)));
+  const [totalReleased] = await db.select({ v: sum(riderPaymentRequestsTable.approvedAmount) }).from(riderPaymentRequestsTable)
+    .where(and(eq(riderPaymentRequestsTable.riderId, rider.id), eq(riderPaymentRequestsTable.status, "released")));
+
   res.json({
     assignedToday: Number(assigned.count),
     deliveredToday: Number(delivered.count),
@@ -231,6 +238,11 @@ router.get("/dashboard/rider-summary", requireAuth, async (req, res): Promise<vo
     failedToday: Number(failed.count),
     codCollectedToday: Number(cod.total ?? 0),
     totalDeliveredAllTime: Number(total.count),
+    commissionRate: Number(rider.commissionRate ?? 0),
+    commissionEarnedToday: Number(todayEarned?.v ?? 0),
+    commissionEarnedTotal: Number(totalEarned?.v ?? 0),
+    commissionReleased: Number(totalReleased?.v ?? 0),
+    commissionPending: Number(totalEarned?.v ?? 0) - Number(totalReleased?.v ?? 0),
   });
 });
 

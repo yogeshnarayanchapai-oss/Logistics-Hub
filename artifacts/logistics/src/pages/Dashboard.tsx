@@ -426,6 +426,41 @@ function RiderDashboard() {
         </Card>
       </div>
 
+      {/* Commission Summary */}
+      {(summary as any).commissionRate > 0 && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Commission Today</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700">Rs. {((summary as any).commissionEarnedToday ?? 0).toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Rs. {(summary as any).commissionRate} per delivery</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Earned</CardTitle>
+              <DollarSign className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Rs. {((summary as any).commissionEarnedTotal ?? 0).toLocaleString()}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-amber-300/60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-amber-700">Pending Payout</CardTitle>
+              <DollarSign className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-700">Rs. {((summary as any).commissionPending ?? 0).toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Go to Payments to request</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Today's Followup Orders */}
       <Card>
         <CardHeader className="pb-3">

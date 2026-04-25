@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { db, bankAccountsTable, paymentRequestsTable, vendorsTable, usersTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { createAuditLog } from "../lib/audit";
@@ -115,7 +115,7 @@ async function formatPaymentRequest(p: typeof paymentRequestsTable.$inferSelect)
     walletMethod: account?.walletMethod ?? null,
     requestedAmount: Number(p.requestedAmount),
     approvedAmount: p.approvedAmount ? Number(p.approvedAmount) : null,
-    status: p.status, note: p.note,
+    status: p.status, note: p.note, adminNote: p.adminNote,
     releaseNote: p.releaseNote, referenceId: p.referenceId,
     paymentDate: p.paymentDate,
     reviewedBy: p.reviewedBy, reviewedByName,
@@ -144,8 +144,8 @@ router.get("/payment-requests", requireAuth, async (req, res): Promise<void> => 
   if (dateTo) conditions.push(lte(paymentRequestsTable.createdAt, new Date(dateTo)));
 
   const reqs = conditions.length > 0
-    ? await db.select().from(paymentRequestsTable).where(conditions.length === 1 ? conditions[0] : and(...conditions))
-    : await db.select().from(paymentRequestsTable);
+    ? await db.select().from(paymentRequestsTable).where(conditions.length === 1 ? conditions[0] : and(...conditions)).orderBy(desc(paymentRequestsTable.createdAt))
+    : await db.select().from(paymentRequestsTable).orderBy(desc(paymentRequestsTable.createdAt));
 
   res.json(await Promise.all(reqs.map(formatPaymentRequest)));
 });
@@ -205,6 +205,25 @@ router.patch("/payment-requests/:id", requireAuth, requireRole("admin", "manager
   if (vendor?.userId) {
     await createNotification({ userId: vendor.userId, title: `Payment Request ${status}`, message: `Your payment request has been ${status}`, type: "payment_update", relatedId: id });
   }
+
+  res.json(await formatPaymentRequest(pr));
+});
+
+// POST /payment-requests/:id/admin-note — send a note to vendor without changing status
+router.post("/payment-requests/:id/admin-note", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
+  const userId = (req as any).userId as number;
+  const id = parseInt(req.params.id, 10);
+  const { note } = req.body;
+  if (!note || !note.trim()) { res.status(400).json({ error: "note is required" }); return; }
+
+  const [pr] = await db.update(paymentRequestsTable).set({ adminNote: note.trim() }).where(eq(paymentRequestsTable.id, id)).returning();
+  if (!pr) { res.status(404).json({ error: "Not found" }); return; }
+
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, pr.vendorId));
+  if (vendor?.userId) {
+    await createNotification({ userId: vendor.userId, title: "Note on Payment Request", message: note.trim(), type: "payment_update", relatedId: id });
+  }
+  await createAuditLog({ userId, action: "admin_note", entity: "payment_request", entityId: id, description: `Admin note added` });
 
   res.json(await formatPaymentRequest(pr));
 });

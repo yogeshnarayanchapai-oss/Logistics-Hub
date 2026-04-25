@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { useListPaymentRequests, useCreatePaymentRequest, useUpdatePaymentRequest, useGetCodSummary, useListBankAccounts, useCreateBankAccount, useUpdateBankAccount, getListPaymentRequestsQueryKey, getGetCodSummaryQueryKey, getListBankAccountsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil, Truck, CheckCircle, XCircle, Eye, Package } from "lucide-react";
+import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil, Truck, CheckCircle, XCircle, Eye, Package, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -160,9 +160,43 @@ export default function Payments() {
   const [viewingPayment, setViewingPayment] = useState<any>(null);
   const [viewOrders, setViewOrders] = useState<any[]>([]);
   const [viewOrdersLoading, setViewOrdersLoading] = useState(false);
+  const [viewAdminNote, setViewAdminNote] = useState("");
+  const [viewNoteSending, setViewNoteSending] = useState(false);
+  const [viewingRiderPayment, setViewingRiderPayment] = useState<any>(null);
+  const [riderViewAdminNote, setRiderViewAdminNote] = useState("");
+  const [riderViewNoteSending, setRiderViewNoteSending] = useState(false);
+
+  const sendAdminNote = async (type: "vendor" | "rider", id: number, note: string, onDone: () => void) => {
+    if (!note.trim()) return;
+    const endpoint = type === "vendor"
+      ? `${BASE}/api/payment-requests/${id}/admin-note`
+      : `${BASE}/api/rider-payment-requests/${id}/admin-note`;
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
+        body: JSON.stringify({ note: note.trim() }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      const updated = await res.json();
+      if (type === "vendor") {
+        setViewingPayment(updated);
+        setViewAdminNote("");
+      } else {
+        setViewingRiderPayment(updated);
+        setRiderViewAdminNote("");
+        fetchRiderPayments();
+      }
+      toast({ title: "Note sent successfully" });
+      onDone();
+    } catch (err: any) {
+      toast({ title: err.message || "Failed to send note", variant: "destructive" });
+    }
+  };
 
   const openViewDialog = (payment: any) => {
     setViewingPayment(payment);
+    setViewAdminNote("");
     setViewOrders([]);
     setViewOrdersLoading(true);
     fetch(`${BASE}/api/orders?vendorId=${payment.vendorId}&status=delivered&limit=200`, {
@@ -230,6 +264,14 @@ export default function Payments() {
     released: "bg-green-100 text-green-700 border-green-300",
     rejected: "bg-red-100 text-red-700 border-red-300",
   };
+
+  const allRequestsSorted = useMemo(() => {
+    const vendorItems = (payments ?? []).map((p: any) => ({ ...p, _type: "vendor" as const }));
+    const riderItems = riderPayments.map((p: any) => ({ ...p, _type: "rider" as const }));
+    return [...vendorItems, ...riderItems].sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [payments, riderPayments]);
 
   return (
     <div className="space-y-6">
@@ -319,85 +361,88 @@ export default function Payments() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {(!payments?.length && !riderPayments.length) ? (
+                        {allRequestsSorted.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
                           </TableRow>
                         ) : (
-                          <>
-                            {payments?.map((payment) => (
-                              <TableRow key={`v-${payment.id}`}>
-                                <TableCell className="font-medium text-sm">{format(new Date(payment.createdAt), "MMM d, yyyy")}</TableCell>
-                                <TableCell><Badge variant="outline" className="text-xs">Vendor</Badge></TableCell>
-                                <TableCell className="text-sm">{payment.vendorName}</TableCell>
-                                <TableCell>
-                                  <div className="text-sm max-w-[160px] truncate">{payment.bankAccountInfo}</div>
-                                  {payment.referenceId && <div className="text-xs text-muted-foreground">Ref: {payment.referenceId}</div>}
-                                </TableCell>
-                                <TableCell className="text-right">Rs. {payment.requestedAmount.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{payment.approvedAmount ? `Rs. ${payment.approvedAmount.toLocaleString()}` : "—"}</TableCell>
-                                <TableCell>
-                                  <Badge variant={payment.status === 'pending' ? 'secondary' : payment.status === 'approved' ? 'default' : payment.status === 'released' ? 'outline' : 'destructive'}
-                                    className={payment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
-                                    {payment.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openViewDialog(payment)}>
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    {payment.status === 'pending' && (
-                                      <>
-                                        <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(payment); setActionType('reject'); }}>Reject</Button>
-                                        <Button size="sm" onClick={() => { setSelectedPayment(payment); setActionType('approve'); }}>Approve</Button>
-                                      </>
-                                    )}
-                                    {payment.status === 'approved' && (
-                                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setSelectedPayment(payment); setActionType('release'); }}>Mark Released</Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                            {riderPayments.map((rp) => (
-                              <TableRow key={`r-${rp.id}`}>
-                                <TableCell className="font-medium text-sm">{format(new Date(rp.createdAt), "MMM d, yyyy")}</TableCell>
-                                <TableCell><Badge variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200">Rider</Badge></TableCell>
-                                <TableCell>
-                                  <div className="text-sm font-medium">{rp.riderName}</div>
-                                  <div className="text-xs text-muted-foreground">{rp.riderEmail}</div>
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  <div>{rp.bankName}</div>
-                                  <div className="text-muted-foreground text-xs">{rp.accountNumber}</div>
-                                </TableCell>
-                                <TableCell className="text-right font-semibold">Rs. {rp.requestedAmount.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{rp.approvedAmount ? `Rs. ${rp.approvedAmount.toLocaleString()}` : "—"}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={riderPaymentStatusColor[rp.status] ?? ""}>
-                                    {rp.status === "released" && <CheckCircle className="mr-1 h-3 w-3" />}
-                                    {rp.status === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
-                                    {rp.status.charAt(0).toUpperCase() + rp.status.slice(1)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {rp.status === "pending" && (
-                                    <div className="flex justify-end gap-2">
+                          allRequestsSorted.map((item) => item._type === "vendor" ? (
+                            <TableRow key={`v-${item.id}`}>
+                              <TableCell className="font-medium text-sm">{format(new Date(item.createdAt), "MMM d, yyyy")}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-xs">Vendor</Badge></TableCell>
+                              <TableCell className="text-sm">{item.vendorName}</TableCell>
+                              <TableCell>
+                                <div className="text-sm max-w-[160px] truncate">{item.bankAccountInfo}</div>
+                                {item.referenceId && <div className="text-xs text-muted-foreground">Ref: {item.referenceId}</div>}
+                              </TableCell>
+                              <TableCell className="text-right">Rs. {item.requestedAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{item.approvedAmount ? `Rs. ${item.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                              <TableCell>
+                                <Badge variant={item.status === 'pending' ? 'secondary' : item.status === 'approved' ? 'default' : item.status === 'released' ? 'outline' : 'destructive'}
+                                  className={item.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
+                                  {item.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openViewDialog(item)}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  {item.status === 'pending' && (
+                                    <>
+                                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(item); setActionType('reject'); }}>Reject</Button>
+                                      <Button size="sm" onClick={() => { setSelectedPayment(item); setActionType('approve'); }}>Approve</Button>
+                                    </>
+                                  )}
+                                  {item.status === 'approved' && (
+                                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setSelectedPayment(item); setActionType('release'); }}>Mark Released</Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <TableRow key={`r-${item.id}`}>
+                              <TableCell className="font-medium text-sm">{format(new Date(item.createdAt), "MMM d, yyyy")}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200">Rider</Badge></TableCell>
+                              <TableCell>
+                                <div className="text-sm font-medium">{item.riderName}</div>
+                                <div className="text-xs text-muted-foreground">{item.riderEmail}</div>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <div>{item.bankName}</div>
+                                <div className="text-muted-foreground text-xs">{item.accountNumber}</div>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">Rs. {item.requestedAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{item.approvedAmount ? `Rs. ${item.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={riderPaymentStatusColor[item.status] ?? ""}>
+                                  {item.status === "released" && <CheckCircle className="mr-1 h-3 w-3" />}
+                                  {item.status === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
+                                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground"
+                                    onClick={() => { setViewingRiderPayment(item); setRiderViewAdminNote(""); }}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  {item.status === "pending" && (
+                                    <>
                                       <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
-                                        onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
+                                        onClick={() => { setSelectedRiderPayment(item); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
                                         Reject
                                       </Button>
                                       <Button size="sm"
-                                        onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
+                                        onClick={() => { setSelectedRiderPayment(item); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
                                         Release
                                       </Button>
-                                    </div>
+                                    </>
                                   )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
                         )}
                       </TableBody>
                     </Table>
@@ -543,18 +588,24 @@ export default function Payments() {
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">{format(new Date(rp.createdAt), "MMM d, yyyy")}</TableCell>
                             <TableCell className="text-right">
-                              {rp.status === "pending" && (
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
-                                    onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
-                                    Reject
-                                  </Button>
-                                  <Button size="sm"
-                                    onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
-                                    Release
-                                  </Button>
-                                </div>
-                              )}
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground"
+                                  onClick={() => { setViewingRiderPayment(rp); setRiderViewAdminNote(""); }}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {rp.status === "pending" && (
+                                  <>
+                                    <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
+                                      onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
+                                      Reject
+                                    </Button>
+                                    <Button size="sm"
+                                      onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
+                                      Release
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -933,6 +984,40 @@ export default function Payments() {
             </div>
           )}
 
+          {/* Admin Note Section */}
+          {viewingPayment && (
+            <div className="px-1 pb-1 space-y-2">
+              {viewingPayment.adminNote && (
+                <div className="rounded-lg border bg-blue-50 border-blue-100 px-3 py-2 text-sm text-blue-800">
+                  <span className="font-medium">Admin Note:</span> {viewingPayment.adminNote}
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Send a note to vendor (no status change)</Label>
+                <Textarea
+                  placeholder="Type a note for the vendor..."
+                  value={viewAdminNote}
+                  onChange={e => setViewAdminNote(e.target.value)}
+                  rows={2}
+                  className="text-sm resize-none"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!viewAdminNote.trim() || viewNoteSending}
+                  onClick={async () => {
+                    setViewNoteSending(true);
+                    await sendAdminNote("vendor", viewingPayment.id, viewAdminNote, () => {});
+                    setViewNoteSending(false);
+                  }}
+                >
+                  {viewNoteSending ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Send className="mr-1.5 h-3 w-3" />}
+                  Send Note
+                </Button>
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:justify-between">
             <Button variant="outline" onClick={() => { setViewingPayment(null); setViewOrders([]); }}>Close</Button>
             {viewingPayment?.status === 'pending' && (
@@ -949,6 +1034,119 @@ export default function Payments() {
               <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setSelectedPayment(viewingPayment); setActionType('release'); setViewingPayment(null); }}>
                 Mark Released
               </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rider Payment Request View Dialog */}
+      <Dialog open={!!viewingRiderPayment} onOpenChange={(open) => { if (!open) setViewingRiderPayment(null); }}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              Rider Payment Request
+            </DialogTitle>
+            <DialogDescription>
+              Submitted on {viewingRiderPayment && format(new Date(viewingRiderPayment.createdAt), "MMM d, yyyy 'at' h:mm a")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewingRiderPayment && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Rider</p>
+                  <p className="font-semibold text-base">{viewingRiderPayment.riderName}</p>
+                  <p className="text-xs text-muted-foreground">{viewingRiderPayment.riderEmail}</p>
+                </div>
+                <div className="rounded-lg border bg-primary/5 p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Requested</p>
+                  <p className="font-bold text-xl text-primary">Rs. {viewingRiderPayment.requestedAmount.toLocaleString()}</p>
+                  {viewingRiderPayment.approvedAmount && (
+                    <p className="text-xs text-emerald-700">Approved: Rs. {viewingRiderPayment.approvedAmount.toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <Badge variant="outline" className={riderPaymentStatusColor[viewingRiderPayment.status] ?? ""}>
+                  {viewingRiderPayment.status === "released" && <CheckCircle className="mr-1 h-3 w-3" />}
+                  {viewingRiderPayment.status === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
+                  {viewingRiderPayment.status.charAt(0).toUpperCase() + viewingRiderPayment.status.slice(1)}
+                </Badge>
+              </div>
+
+              <div className="rounded-lg border p-4 space-y-2">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                  <Building className="h-3.5 w-3.5" /> Bank Details
+                </p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                  <div><span className="text-muted-foreground">Bank:</span> <span className="font-medium">{viewingRiderPayment.bankName}</span></div>
+                  <div><span className="text-muted-foreground">Account:</span> <span className="font-mono font-semibold">{viewingRiderPayment.accountNumber}</span></div>
+                </div>
+              </div>
+
+              {viewingRiderPayment.note && (
+                <div className="rounded-lg border bg-yellow-50 border-yellow-100 px-3 py-2 text-sm text-yellow-800">
+                  <span className="font-medium">Rider Note:</span> {viewingRiderPayment.note}
+                </div>
+              )}
+
+              {viewingRiderPayment.status === "released" && (viewingRiderPayment.referenceId || viewingRiderPayment.releaseNote) && (
+                <div className="rounded-lg border bg-emerald-50 border-emerald-100 px-3 py-2 text-sm text-emerald-800 space-y-1">
+                  {viewingRiderPayment.referenceId && <div><span className="font-medium">Ref:</span> {viewingRiderPayment.referenceId}</div>}
+                  {viewingRiderPayment.paymentDate && <div><span className="font-medium">Date:</span> {viewingRiderPayment.paymentDate}</div>}
+                  {viewingRiderPayment.releaseNote && <div><span className="font-medium">Note:</span> {viewingRiderPayment.releaseNote}</div>}
+                </div>
+              )}
+
+              {/* Admin Note Section */}
+              <div className="space-y-1.5 border-t pt-3">
+                {viewingRiderPayment.adminNote && (
+                  <div className="rounded-lg border bg-blue-50 border-blue-100 px-3 py-2 text-sm text-blue-800 mb-2">
+                    <span className="font-medium">Admin Note:</span> {viewingRiderPayment.adminNote}
+                  </div>
+                )}
+                <Label className="text-xs text-muted-foreground">Send a note to rider (no status change)</Label>
+                <Textarea
+                  placeholder="Type a note for the rider..."
+                  value={riderViewAdminNote}
+                  onChange={e => setRiderViewAdminNote(e.target.value)}
+                  rows={2}
+                  className="text-sm resize-none"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!riderViewAdminNote.trim() || riderViewNoteSending}
+                  onClick={async () => {
+                    setRiderViewNoteSending(true);
+                    await sendAdminNote("rider", viewingRiderPayment.id, riderViewAdminNote, () => {});
+                    setRiderViewNoteSending(false);
+                  }}
+                >
+                  {riderViewNoteSending ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Send className="mr-1.5 h-3 w-3" />}
+                  Send Note
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="outline" onClick={() => setViewingRiderPayment(null)}>Close</Button>
+            {viewingRiderPayment?.status === "pending" && (
+              <div className="flex gap-2">
+                <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => { setSelectedRiderPayment(viewingRiderPayment); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); setViewingRiderPayment(null); }}>
+                  Reject
+                </Button>
+                <Button
+                  onClick={() => { setSelectedRiderPayment(viewingRiderPayment); setRiderActionType("release"); setRiderReleaseDialogOpen(true); setViewingRiderPayment(null); }}>
+                  Release
+                </Button>
+              </div>
             )}
           </DialogFooter>
         </DialogContent>

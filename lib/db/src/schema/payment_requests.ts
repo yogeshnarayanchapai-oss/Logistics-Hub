@@ -11,6 +11,7 @@ export const paymentRequestsTable = pgTable("payment_requests", {
   status: text("status").notNull().default("pending"),
   note: text("note"),
   releaseNote: text("release_note"),
+  adminNote: text("admin_note"),
   referenceId: text("reference_id"),
   paymentDate: text("payment_date"),
   reviewedBy: integer("reviewed_by"),

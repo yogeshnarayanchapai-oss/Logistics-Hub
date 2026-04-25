@@ -21,6 +21,7 @@ async function formatRequest(r: typeof riderPaymentRequestsTable.$inferSelect) {
     approvedAmount: r.approvedAmount ? Number(r.approvedAmount) : null,
     status: r.status,
     note: r.note,
+    adminNote: r.adminNote,
     releaseNote: r.releaseNote,
     referenceId: r.referenceId,
     paymentDate: r.paymentDate,
@@ -116,6 +117,23 @@ router.patch("/rider-payment-requests/:id", requireAuth, requireRole("admin", "m
       ? `Your payment request of Rs. ${Number(updated.approvedAmount ?? updated.requestedAmount).toLocaleString()} has been released.`
       : `Your payment request has been rejected. ${releaseNote ?? ""}`;
     await createNotification({ userId: rider.userId, title: status === "released" ? "Payment Released" : "Payment Rejected", message: msg, type: "payment_released", relatedId: id });
+  }
+
+  res.json(await formatRequest(updated));
+});
+
+// POST /rider-payment-requests/:id/admin-note — send a note to rider without changing status
+router.post("/rider-payment-requests/:id/admin-note", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  const { note } = req.body;
+  if (!note || !note.trim()) { res.status(400).json({ error: "note is required" }); return; }
+
+  const [updated] = await db.update(riderPaymentRequestsTable).set({ adminNote: note.trim() }).where(eq(riderPaymentRequestsTable.id, id)).returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+
+  const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.id, updated.riderId));
+  if (rider?.userId) {
+    await createNotification({ userId: rider.userId, title: "Note on Payment Request", message: note.trim(), type: "payment_released", relatedId: id });
   }
 
   res.json(await formatRequest(updated));

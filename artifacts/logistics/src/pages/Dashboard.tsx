@@ -370,14 +370,10 @@ function VendorDashboard() {
 }
 
 const RIDER_STATUSES = [
-  { value: "picked_for_delivery", label: "Picked for Delivery", color: "bg-purple-100 text-purple-700" },
-  { value: "out_for_delivery", label: "Out for Delivery", color: "bg-blue-100 text-blue-800" },
   { value: "delivered", label: "Delivered", color: "bg-green-100 text-green-800" },
   { value: "partial_delivered", label: "Partial Delivery", color: "bg-teal-100 text-teal-800" },
   { value: "failed_delivery", label: "Failed Delivery", color: "bg-red-100 text-red-800" },
-  { value: "followup", label: "Follow Up", color: "bg-amber-100 text-amber-800" },
   { value: "reschedule", label: "Reschedule", color: "bg-orange-100 text-orange-800" },
-  { value: "return_pending", label: "Return", color: "bg-gray-100 text-gray-800" },
 ];
 
 function statusLabel(s: string) {
@@ -412,6 +408,7 @@ interface OrderItem {
   productName: string;
   status: string;
   followupDate?: string | null;
+  latestComment?: { content: string; userRole: string; createdAt: string } | null;
 }
 
 function StatusUpdateSheet({
@@ -545,71 +542,149 @@ function StatusUpdateSheet({
   );
 }
 
+function QuickCommentSheet({
+  order,
+  open,
+  onClose,
+  onAdded,
+}: {
+  order: OrderItem | null;
+  open: boolean;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const { toast } = useToast();
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => { if (open) setComment(""); }, [open]);
+
+  const handleSubmit = async () => {
+    if (!order || !comment.trim()) return;
+    setSubmitting(true);
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    const token = localStorage.getItem("authToken");
+    try {
+      const res = await fetch(`${base}/api/orders/${order.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: comment.trim(), visibility: "all" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "Comment added" });
+      onAdded();
+      onClose();
+    } catch {
+      toast({ title: "Could not add comment", variant: "destructive" });
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="text-left">Add Comment</SheetTitle>
+          {order && (
+            <div className="text-left">
+              <span className="font-semibold text-sm">{order.orderCode}</span>
+              <span className="text-muted-foreground text-sm"> · {order.customerName}</span>
+            </div>
+          )}
+        </SheetHeader>
+        <div className="space-y-4">
+          <Textarea
+            placeholder="Write a comment..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            className="min-h-[100px] text-base resize-none"
+            autoFocus
+          />
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1 h-12" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button className="flex-1 h-12 text-base" onClick={handleSubmit} disabled={submitting || !comment.trim()}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post Comment"}
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function OrderCard({ order, onUpdate }: { order: OrderItem; onUpdate: () => void }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [commentOpen, setCommentOpen] = useState(false);
+  const unreplied = order.latestComment && order.latestComment.userRole !== "rider";
+
   return (
     <>
-      <div className="flex items-start gap-3 py-3 px-1">
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">{order.orderCode}</span>
-            <Badge className={`text-[10px] px-1.5 py-0 h-5 border-0 ${statusColor(order.status)}`}>
-              {statusLabel(order.status)}
-            </Badge>
+      <div className="py-3 px-1 space-y-2">
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm">{order.orderCode}</span>
+              <Badge className={`text-[10px] px-1.5 py-0 h-5 border-0 ${statusColor(order.status)}`}>
+                {statusLabel(order.status)}
+              </Badge>
+              {unreplied && (
+                <Badge className="text-[10px] px-1.5 py-0 h-5 border-0 bg-red-100 text-red-700">
+                  Unreplied
+                </Badge>
+              )}
+            </div>
+            <div className="text-sm font-medium truncate">{order.customerName}</div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{order.customerPhone}</span>
+              {(order.area || order.city) && (
+                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{[order.area, order.city].filter(Boolean).join(", ")}</span>
+              )}
+              {order.followupDate && (
+                <span className="flex items-center gap-1 text-amber-600 font-medium">
+                  <CalendarClock className="h-3 w-3" />{format(new Date(order.followupDate), "h:mm a")}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground">{order.productName}</div>
           </div>
-          <div className="text-sm font-medium truncate">{order.customerName}</div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{order.customerPhone}</span>
-            {(order.area || order.city) && (
-              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{[order.area, order.city].filter(Boolean).join(", ")}</span>
-            )}
-            {order.followupDate && (
-              <span className="flex items-center gap-1 text-amber-600 font-medium">
-                <CalendarClock className="h-3 w-3" />{format(new Date(order.followupDate), "h:mm a")}
-              </span>
-            )}
+          <div className="shrink-0 flex flex-col items-end gap-2">
+            <div className="text-sm font-bold text-green-700">Rs. {order.codAmount.toLocaleString()}</div>
+            <div className="flex items-center gap-1.5">
+              <Button size="sm" variant="outline" className="h-8 text-xs px-2.5 gap-1" onClick={() => setCommentOpen(true)}>
+                <MessageSquare className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs px-2.5" onClick={() => setSheetOpen(true)}>
+                Update
+              </Button>
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">{order.productName}</div>
         </div>
-        <div className="shrink-0 flex flex-col items-end gap-2">
-          <div className="text-sm font-bold text-green-700">Rs. {order.codAmount.toLocaleString()}</div>
-          <Button size="sm" variant="outline" className="h-8 text-xs px-2.5" onClick={() => setSheetOpen(true)}>
-            Update
-          </Button>
-        </div>
+        {order.latestComment && (
+          <div className={`rounded-md px-3 py-2 text-xs flex items-start gap-2 ${unreplied ? "bg-red-50 border border-red-100" : "bg-muted/50"}`}>
+            <MessageSquare className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${unreplied ? "text-red-500" : "text-muted-foreground"}`} />
+            <span className="line-clamp-2 text-foreground/80">{order.latestComment.content}</span>
+          </div>
+        )}
       </div>
-      <StatusUpdateSheet
-        order={order}
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        onUpdated={onUpdate}
-      />
+      <StatusUpdateSheet order={order} open={sheetOpen} onClose={() => setSheetOpen(false)} onUpdated={onUpdate} />
+      <QuickCommentSheet order={order} open={commentOpen} onClose={() => setCommentOpen(false)} onAdded={onUpdate} />
     </>
   );
 }
 
 function RiderDashboard() {
   const { data: summary, isLoading } = useGetRiderDashboardSummary();
-  const { toast } = useToast();
 
   const [activeOrders, setActiveOrders] = useState<OrderItem[]>([]);
-  const [followups, setFollowups] = useState<OrderItem[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
   const fetchOrders = useCallback(() => {
     const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
     const token = localStorage.getItem("authToken");
-    const headers = { Authorization: `Bearer ${token}` };
     setOrdersLoading(true);
-    Promise.all([
-      fetch(`${base}/api/dashboard/rider-today-orders`, { headers }).then((r) => r.json()),
-      fetch(`${base}/api/dashboard/rider-followups`, { headers }).then((r) => r.json()),
-    ])
-      .then(([active, fu]) => {
-        setActiveOrders(Array.isArray(active) ? active : []);
-        setFollowups(Array.isArray(fu) ? fu : []);
-      })
-      .catch(() => { setActiveOrders([]); setFollowups([]); })
+    fetch(`${base}/api/dashboard/rider-today-orders`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => setActiveOrders(Array.isArray(data) ? data : []))
+      .catch(() => setActiveOrders([]))
       .finally(() => setOrdersLoading(false));
   }, []);
 
@@ -623,41 +698,41 @@ function RiderDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Assigned Today</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
+            <CardTitle className="text-xs font-medium">Assigned Today</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold">{summary.assignedToday}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Delivered Today</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
+            <CardTitle className="text-xs font-medium">Delivered Today</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold">{summary.deliveredToday}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Today</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
+            <CardTitle className="text-xs font-medium">Pending Today</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold">{summary.pendingToday}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">COD Collected Today</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
+            <CardTitle className="text-xs font-medium">COD Collected</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">Rs. {summary.codCollectedToday.toLocaleString()}</div>
+          <CardContent className="px-4 pb-4">
+            <div className="text-xl font-bold">Rs. {summary.codCollectedToday.toLocaleString()}</div>
           </CardContent>
         </Card>
       </div>
@@ -686,44 +761,11 @@ function RiderDashboard() {
           ) : activeOrders.length === 0 ? (
             <div className="flex flex-col items-center py-8 text-center text-muted-foreground">
               <Package className="h-10 w-10 mb-2 opacity-25" />
-              <p className="text-sm">No active orders right now.</p>
+              <p className="text-sm">No active orders for today.</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
               {activeOrders.map((order) => (
-                <OrderCard key={order.id} order={order} onUpdate={fetchOrders} />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Today's Follow-ups & Rescheduled */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CalendarClock className="h-5 w-5 text-amber-500" />
-              Today's Follow-ups
-              {followups.length > 0 && (
-                <Badge className="ml-1 bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100 text-xs">
-                  {followups.length}
-                </Badge>
-              )}
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {ordersLoading ? (
-            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : followups.length === 0 ? (
-            <div className="flex flex-col items-center py-8 text-center text-muted-foreground">
-              <CalendarClock className="h-10 w-10 mb-2 opacity-25" />
-              <p className="text-sm">No follow-up or rescheduled orders for today.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {followups.map((order) => (
                 <OrderCard key={order.id} order={order} onUpdate={fetchOrders} />
               ))}
             </div>

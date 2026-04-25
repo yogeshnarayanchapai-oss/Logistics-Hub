@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, count, sum, sql, desc, gte, lt, inArray, notInArray, lte, isNotNull } from "drizzle-orm";
+import { eq, and, or, count, sum, sql, desc, gte, lt, inArray, notInArray, lte, isNotNull } from "drizzle-orm";
 import { db, ordersTable, vendorsTable, ridersTable, ticketsTable, paymentRequestsTable, riderCommissionsTable, riderPaymentRequestsTable, stationsTable, usersTable, orderCommentsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 
@@ -284,12 +284,48 @@ router.get("/dashboard/rider-today-orders", requireAuth, async (req, res): Promi
   const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.userId, userId));
   if (!rider) { res.status(404).json({ error: "Rider not found" }); return; }
 
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const terminalStatuses = ["delivered", "returned", "cancelled", "payment_released", "payment_pending"];
+
   const orders = await db.select().from(ordersTable)
     .where(and(
       eq(ordersTable.riderId, rider.id),
-      notInArray(ordersTable.status, ["delivered", "returned", "cancelled", "payment_released", "payment_pending"]),
+      notInArray(ordersTable.status, terminalStatuses),
+      or(
+        // assigned/created today
+        and(gte(ordersTable.createdAt, today), lt(ordersTable.createdAt, tomorrow)),
+        // rescheduled/followup scheduled for today
+        and(
+          inArray(ordersTable.status, ["followup", "reschedule"]),
+          isNotNull(ordersTable.followupDate),
+          gte(ordersTable.followupDate, today),
+          lt(ordersTable.followupDate, tomorrow),
+        )
+      )
     ))
     .orderBy(desc(ordersTable.createdAt));
+
+  // Fetch latest comment per order (with user role)
+  const orderIds = orders.map(o => o.id);
+  const latestComments: Record<number, { content: string; userRole: string; createdAt: string }> = {};
+  if (orderIds.length > 0) {
+    const comments = await db.select({
+      orderId: orderCommentsTable.orderId,
+      content: orderCommentsTable.content,
+      createdAt: orderCommentsTable.createdAt,
+      userRole: usersTable.role,
+    })
+    .from(orderCommentsTable)
+    .innerJoin(usersTable, eq(orderCommentsTable.userId, usersTable.id))
+    .where(inArray(orderCommentsTable.orderId, orderIds))
+    .orderBy(desc(orderCommentsTable.createdAt));
+    for (const c of comments) {
+      if (!latestComments[c.orderId]) {
+        latestComments[c.orderId] = { content: c.content, userRole: c.userRole ?? "unknown", createdAt: c.createdAt.toISOString() };
+      }
+    }
+  }
 
   res.json(orders.map((o) => ({
     id: o.id,
@@ -302,6 +338,8 @@ router.get("/dashboard/rider-today-orders", requireAuth, async (req, res): Promi
     codAmount: Number(o.codAmount),
     productName: o.productName,
     status: o.status,
+    followupDate: o.followupDate ? o.followupDate.toISOString() : null,
+    latestComment: latestComments[o.id] ?? null,
   })));
 });
 

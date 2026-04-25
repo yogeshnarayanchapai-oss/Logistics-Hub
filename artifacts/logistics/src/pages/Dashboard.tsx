@@ -6,9 +6,12 @@ import {
   useGetOrderTrends,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Package, CheckCircle, XCircle, Clock, Truck, DollarSign, Users, Store, AlertTriangle, MessageSquare } from "lucide-react";
+import { Loader2, Package, CheckCircle, XCircle, Clock, Truck, DollarSign, Users, Store, AlertTriangle, MessageSquare, CalendarClock, Phone, MapPin } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -363,6 +366,19 @@ function VendorDashboard() {
 function RiderDashboard() {
   const { data: summary, isLoading } = useGetRiderDashboardSummary();
 
+  const [followups, setFollowups] = useState<any[]>([]);
+  const [followupsLoading, setFollowupsLoading] = useState(true);
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    const token = localStorage.getItem("auth_token");
+    fetch(`${base}/api/dashboard/rider-followups`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setFollowups(Array.isArray(d) ? d : []))
+      .catch(() => setFollowups([]))
+      .finally(() => setFollowupsLoading(false));
+  }, []);
+
   if (isLoading) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -370,41 +386,96 @@ function RiderDashboard() {
   if (!summary) return null;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Assigned Today</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.assignedToday}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Delivered Today</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.deliveredToday}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Today</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summary.pendingToday}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">COD Collected Today</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Rs. {summary.codCollectedToday.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Today's Followup Orders */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Assigned Today</CardTitle>
-          <Package className="h-4 w-4 text-muted-foreground" />
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarClock className="h-5 w-5 text-amber-500" />
+            Today's Follow-up Orders
+            {followups.length > 0 && (
+              <Badge className="ml-1 bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100 text-xs">
+                {followups.length}
+              </Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{summary.assignedToday}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Delivered Today</CardTitle>
-          <CheckCircle className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{summary.deliveredToday}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pending Today</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{summary.pendingToday}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">COD Collected Today</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">Rs. {summary.codCollectedToday.toLocaleString()}</div>
+          {followupsLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : followups.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center text-muted-foreground">
+              <CalendarClock className="h-10 w-10 mb-2 opacity-25" />
+              <p className="text-sm">No follow-up orders due today.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {followups.map((order) => (
+                <Link key={order.id} href={`/rider/orders/${order.id}`}>
+                  <div className="flex items-start justify-between py-3 hover:bg-muted/40 px-1 rounded-lg cursor-pointer transition-colors">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">{order.orderCode}</span>
+                        <span className="text-xs text-muted-foreground">· {order.productName}</span>
+                      </div>
+                      <div className="text-sm font-medium">{order.customerName}</div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{order.customerPhone}</span>
+                        {(order.area || order.city) && (
+                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{[order.area, order.city].filter(Boolean).join(", ")}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <div className="text-sm font-bold text-green-700">Rs. {order.codAmount.toLocaleString()}</div>
+                      <div className="text-xs text-amber-600 font-medium mt-0.5">
+                        {order.followupDate ? format(new Date(order.followupDate), "h:mm a") : "Today"}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

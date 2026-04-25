@@ -19,6 +19,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     if (l === 'delivered') return "bg-green-100 text-green-800 border-green-200";
     if (l === 'partial delivered' || l === 'partial_delivered') return "bg-teal-100 text-teal-800 border-teal-200";
     if (l === 'failed delivery' || l === 'failed_delivery') return "bg-red-100 text-red-800 border-red-200";
+    if (l === 'followup') return "bg-amber-100 text-amber-800 border-amber-200";
     if (l === 'reschedule') return "bg-amber-100 text-amber-800 border-amber-200";
     if (l === 'return pending' || l === 'return_pending') return "bg-orange-100 text-orange-800 border-orange-200";
     if (l === 'returned') return "bg-gray-200 text-gray-800 border-gray-300";

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, count, sum, sql, desc, gte, lt, inArray } from "drizzle-orm";
+import { eq, and, count, sum, sql, desc, gte, lt, inArray, lte, isNotNull } from "drizzle-orm";
 import { db, ordersTable, vendorsTable, ridersTable, ticketsTable, paymentRequestsTable, stationsTable, usersTable, orderCommentsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 
@@ -232,6 +232,38 @@ router.get("/dashboard/rider-summary", requireAuth, async (req, res): Promise<vo
     codCollectedToday: Number(cod.total ?? 0),
     totalDeliveredAllTime: Number(total.count),
   });
+});
+
+router.get("/dashboard/rider-followups", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).userId as number;
+  const [rider] = await db.select().from(ridersTable).where(eq(ridersTable.userId, userId));
+  if (!rider) { res.status(404).json({ error: "Rider not found" }); return; }
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const orders = await db.select().from(ordersTable)
+    .where(and(
+      eq(ordersTable.riderId, rider.id),
+      eq(ordersTable.status, "followup"),
+      isNotNull(ordersTable.followupDate),
+      gte(ordersTable.followupDate, today),
+      lt(ordersTable.followupDate, tomorrow),
+    ))
+    .orderBy(ordersTable.followupDate);
+
+  res.json(orders.map((o) => ({
+    id: o.id,
+    orderCode: o.orderCode,
+    customerName: o.customerName,
+    customerPhone: o.customerPhone,
+    address: o.address,
+    area: o.area,
+    city: o.city,
+    followupDate: o.followupDate ? o.followupDate.toISOString() : null,
+    codAmount: Number(o.codAmount),
+    productName: o.productName,
+  })));
 });
 
 router.get("/dashboard/order-trends", requireAuth, async (req, res): Promise<void> => {

@@ -122,6 +122,7 @@ async function formatOrder(o: typeof ordersTable.$inferSelect, viewerVendorId?: 
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
     deliveredAt: o.deliveredAt ? o.deliveredAt.toISOString() : null,
+    followupDate: o.followupDate ? o.followupDate.toISOString() : null,
   };
 }
 
@@ -462,14 +463,19 @@ router.post("/orders/:id/status", requireAuth, async (req, res): Promise<void> =
   const userRole = (req as any).userRole as string;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  const { status, comment } = req.body;
+  const { status, comment, followupDate } = req.body;
   if (!status) { res.status(400).json({ error: "status required" }); return; }
 
-  const validStatuses = ["new", "duplicate_flagged", "under_review", "confirmed", "assigned", "picked_for_delivery", "out_for_delivery", "delivered", "partial_delivered", "failed_delivery", "reschedule", "return_pending", "returned", "cancelled", "payment_pending", "payment_released"];
+  const validStatuses = ["new", "duplicate_flagged", "under_review", "confirmed", "assigned", "picked_for_delivery", "out_for_delivery", "delivered", "partial_delivered", "failed_delivery", "followup", "reschedule", "return_pending", "returned", "cancelled", "payment_pending", "payment_released"];
   if (!validStatuses.includes(status)) { res.status(400).json({ error: "Invalid status" }); return; }
 
   const updateData: Record<string, unknown> = { status };
   if (status === "delivered") updateData.deliveredAt = new Date();
+  if (status === "followup" && followupDate) {
+    updateData.followupDate = new Date(followupDate);
+  } else if (status !== "followup") {
+    updateData.followupDate = null;
+  }
 
   const [order] = await db.update(ordersTable).set(updateData as any).where(eq(ordersTable.id, id)).returning();
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }

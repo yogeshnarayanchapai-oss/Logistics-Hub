@@ -44,6 +44,8 @@ export default function OrderDetail() {
 
   const [newComment, setNewComment] = useState("");
   const [commentVisibility, setCommentVisibility] = useState<"all" | "internal" | "vendor" | "rider">("all");
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [followupDate, setFollowupDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   const addCommentMutation = useAddOrderComment({
     mutation: {
@@ -70,13 +72,22 @@ export default function OrderDetail() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(orderId) });
+        setPendingStatus(null);
         toast({ title: "Status updated" });
       }
     }
   });
 
-  const handleStatusUpdate = (status: string) => {
+  const handleStatusUpdate = (status: string, date?: string) => {
+    if (status === "followup") {
+      setPendingStatus("followup");
+      return;
+    }
     updateStatusMutation.mutate({ id: orderId, data: { status } });
+  };
+
+  const confirmFollowup = () => {
+    updateStatusMutation.mutate({ id: orderId, data: { status: "followup", followupDate } as any });
   };
 
   const { data: riders } = useListRiders({ status: "active" }, {
@@ -139,13 +150,19 @@ export default function OrderDetail() {
             </Button>
           </Link>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-2xl font-bold tracking-tight">{order.orderCode}</h2>
               <StatusBadge status={order.status} />
               {order.duplicateFlag && (
                 <Badge variant="destructive" className="flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
                   Duplicate Flagged
+                </Badge>
+              )}
+              {(order as any).followupDate && order.status === "followup" && (
+                <Badge className="flex items-center gap-1 bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100">
+                  <Clock className="h-3 w-3" />
+                  Followup: {format(new Date((order as any).followupDate), "MMM d, yyyy")}
                 </Badge>
               )}
             </div>
@@ -155,17 +172,39 @@ export default function OrderDetail() {
 
         <div className="flex items-center gap-2">
           {isRider ? (
-            <Select onValueChange={handleStatusUpdate} value={order.status}>
-              <SelectTrigger className="w-[190px]">
-                <SelectValue placeholder="Update Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="picked_up">Picked Up</SelectItem>
-                <SelectItem value="in_transit">In Transit</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="failed_delivery">Failed Delivery</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              {pendingStatus === "followup" ? (
+                <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-amber-50 border-amber-200">
+                  <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span className="text-sm text-amber-800 font-medium">Followup date:</span>
+                  <input
+                    type="date"
+                    value={followupDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setFollowupDate(e.target.value)}
+                    className="text-sm border-0 bg-transparent text-amber-900 focus:outline-none"
+                  />
+                  <Button size="sm" className="h-7 text-xs" onClick={confirmFollowup} disabled={updateStatusMutation.isPending}>
+                    {updateStatusMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm"}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setPendingStatus(null)}>Cancel</Button>
+                </div>
+              ) : (
+                <Select onValueChange={handleStatusUpdate} value={order.status}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Update Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="picked_up">Picked Up</SelectItem>
+                    <SelectItem value="in_transit">In Transit</SelectItem>
+                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="failed_delivery">Failed Delivery</SelectItem>
+                    <SelectItem value="followup">Follow Up</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           ) : (
             <>
               {["admin", "manager"].includes(user?.role || "") && (

@@ -1,4 +1,4 @@
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, KeyboardEvent, useCallback } from "react";
 import { useListRiders, useCreateRider, useUpdateRider, useListStations, getListRidersQueryKey, getListUsersQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,9 +11,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Truck, Pencil, ToggleLeft, ToggleRight, MoreHorizontal, X } from "lucide-react";
+import { Loader2, Plus, Search, Truck, Pencil, ToggleLeft, ToggleRight, MoreHorizontal, X, CreditCard, Building, Trash2 } from "lucide-react";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +96,64 @@ export default function Riders() {
   const [editingRider, setEditingRider] = useState<any>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+  const token = () => localStorage.getItem("auth_token");
+
+  const [bankRider, setBankRider] = useState<any>(null);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [bankAddOpen, setBankAddOpen] = useState(false);
+  const [bankSaving, setBankSaving] = useState(false);
+
+  const openBankDialog = useCallback(async (rider: any) => {
+    setBankRider(rider);
+    setBankAccounts([]);
+    setBankLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/rider-bank-accounts?riderId=${rider.id}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      setBankAccounts(Array.isArray(data) ? data : []);
+    } finally { setBankLoading(false); }
+  }, [BASE]);
+
+  const handleAddBankAccount = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setBankSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/rider-bank-accounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({
+          riderId: bankRider.id,
+          accountHolderName: fd.get("accountHolderName"),
+          bankName: fd.get("bankName"),
+          branch: fd.get("branch") || null,
+          accountNumber: fd.get("accountNumber"),
+          walletMethod: fd.get("walletMethod") || null,
+          isDefault: bankAccounts.length === 0,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      toast({ title: "Bank account added" });
+      setBankAddOpen(false);
+      const updated = await fetch(`${BASE}/api/rider-bank-accounts?riderId=${bankRider.id}`, { headers: { Authorization: `Bearer ${token()}` } });
+      setBankAccounts(await updated.json());
+    } catch (err: any) {
+      toast({ title: err.message || "Failed to add account", variant: "destructive" });
+    } finally { setBankSaving(false); }
+  };
+
+  const handleDeleteBankAccount = async (id: number) => {
+    try {
+      await fetch(`${BASE}/api/rider-bank-accounts/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token()}` } });
+      toast({ title: "Account removed" });
+      setBankAccounts(prev => prev.filter(a => a.id !== id));
+    } catch { toast({ title: "Failed to remove account", variant: "destructive" }); }
+  };
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getListRidersQueryKey() });
@@ -248,16 +306,22 @@ export default function Riders() {
                                   <Pencil className="mr-2 h-4 w-4" /> Edit
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem className="cursor-pointer" onClick={() => { setBankAddOpen(false); openBankDialog(rider); }}>
+                                <CreditCard className="mr-2 h-4 w-4" /> Bank Accounts
+                              </DropdownMenuItem>
                               {canManage && (
-                                <DropdownMenuItem
-                                  className={`cursor-pointer ${rider.status === "active" ? "text-orange-600 focus:text-orange-700" : "text-green-700 focus:text-green-700"}`}
-                                  onClick={() => toggleStatus(rider)}
-                                  disabled={updateMutation.isPending}
-                                >
-                                  {rider.status === "active"
-                                    ? <><ToggleRight className="mr-2 h-4 w-4" /> Deactivate</>
-                                    : <><ToggleLeft className="mr-2 h-4 w-4" /> Activate</>}
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className={`cursor-pointer ${rider.status === "active" ? "text-orange-600 focus:text-orange-700" : "text-green-700 focus:text-green-700"}`}
+                                    onClick={() => toggleStatus(rider)}
+                                    disabled={updateMutation.isPending}
+                                  >
+                                    {rider.status === "active"
+                                      ? <><ToggleRight className="mr-2 h-4 w-4" /> Deactivate</>
+                                      : <><ToggleLeft className="mr-2 h-4 w-4" /> Activate</>}
+                                  </DropdownMenuItem>
+                                </>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -364,6 +428,97 @@ export default function Riders() {
         </DialogContent>
       </Dialog>
 
+      {/* Rider Bank Accounts Dialog */}
+      <Dialog open={!!bankRider} onOpenChange={(open) => { if (!open) { setBankRider(null); setBankAddOpen(false); } }}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Bank Accounts — {bankRider?.name}
+            </DialogTitle>
+            <DialogDescription>View and manage this rider's linked bank accounts.</DialogDescription>
+          </DialogHeader>
+
+          {!bankAddOpen ? (
+            <>
+              <div className="space-y-3 max-h-72 overflow-y-auto py-1">
+                {bankLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+                ) : bankAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No bank accounts added yet.</p>
+                ) : (
+                  bankAccounts.map((acc) => (
+                    <div key={acc.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Building className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <div>
+                          <div className="font-medium text-sm flex items-center gap-2">
+                            {acc.bankName}
+                            {acc.isDefault && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">Default</Badge>}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {acc.accountHolderName} · {acc.accountNumber}
+                            {acc.branch ? ` · ${acc.branch}` : ""}
+                            {acc.walletMethod ? ` · ${acc.walletMethod}` : ""}
+                          </div>
+                        </div>
+                      </div>
+                      {canManage && (
+                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700"
+                          onClick={() => handleDeleteBankAccount(acc.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+              <DialogFooter className="sm:justify-between">
+                {canManage && (
+                  <Button variant="outline" onClick={() => setBankAddOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Account
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={() => setBankRider(null)}>Close</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <form onSubmit={handleAddBankAccount}>
+              <div className="grid gap-4 py-2">
+                <h3 className="font-medium text-sm">New Bank Account</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="ba-holder">Account Holder Name *</Label>
+                  <Input id="ba-holder" name="accountHolderName" required defaultValue={bankRider?.name} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ba-bank">Bank Name *</Label>
+                    <Input id="ba-bank" name="bankName" required placeholder="e.g. NIC Asia" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ba-branch">Branch</Label>
+                    <Input id="ba-branch" name="branch" placeholder="e.g. Kathmandu" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ba-account">Account Number *</Label>
+                  <Input id="ba-account" name="accountNumber" required placeholder="e.g. 0075291234567890" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ba-wallet">Mobile Wallet (optional)</Label>
+                  <Input id="ba-wallet" name="walletMethod" placeholder="e.g. eSewa 9841234567" />
+                </div>
+              </div>
+              <DialogFooter className="sm:justify-between mt-4">
+                <Button type="button" variant="ghost" onClick={() => setBankAddOpen(false)}>← Back</Button>
+                <Button type="submit" disabled={bankSaving}>
+                  {bankSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Account
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

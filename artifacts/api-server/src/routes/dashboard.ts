@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, count, sum, sql, desc, gte, lt, inArray, lte, isNotNull } from "drizzle-orm";
+import { eq, and, count, sum, sql, desc, gte, lt, inArray, notInArray, lte, isNotNull } from "drizzle-orm";
 import { db, ordersTable, vendorsTable, ridersTable, ticketsTable, paymentRequestsTable, riderCommissionsTable, riderPaymentRequestsTable, stationsTable, usersTable, orderCommentsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 
@@ -287,7 +287,7 @@ router.get("/dashboard/rider-today-orders", requireAuth, async (req, res): Promi
   const orders = await db.select().from(ordersTable)
     .where(and(
       eq(ordersTable.riderId, rider.id),
-      inArray(ordersTable.status, ["assigned", "confirmed", "picked_for_delivery", "out_for_delivery"]),
+      notInArray(ordersTable.status, ["delivered", "returned", "cancelled", "payment_released", "payment_pending"]),
     ))
     .orderBy(desc(ordersTable.createdAt));
 

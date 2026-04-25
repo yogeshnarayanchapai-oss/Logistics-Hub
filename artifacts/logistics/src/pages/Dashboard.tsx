@@ -370,6 +370,7 @@ function VendorDashboard() {
 }
 
 const RIDER_STATUSES = [
+  { value: "picked_for_delivery", label: "Picked for Delivery", color: "bg-purple-100 text-purple-700" },
   { value: "out_for_delivery", label: "Out for Delivery", color: "bg-blue-100 text-blue-800" },
   { value: "delivered", label: "Delivered", color: "bg-green-100 text-green-800" },
   { value: "partial_delivered", label: "Partial Delivery", color: "bg-teal-100 text-teal-800" },

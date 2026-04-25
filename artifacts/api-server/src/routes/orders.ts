@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, or, sql, count, desc, gte, lte } from "drizzle-orm";
-import { db, ordersTable, vendorsTable, ridersTable, stationsTable, orderCommentsTable, orderStatusHistoryTable, usersTable, notificationsTable } from "@workspace/db";
+import { db, ordersTable, vendorsTable, ridersTable, stationsTable, orderCommentsTable, orderStatusHistoryTable, usersTable, notificationsTable, riderInventoryTable, stockTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { createAuditLog } from "../lib/audit";
 import { createNotification } from "../lib/notifications";
@@ -488,11 +488,33 @@ router.post("/orders/:id/status", requireAuth, async (req, res): Promise<void> =
 
   await createAuditLog({ userId, action: "status_change", entity: "order", entityId: id, description: `Changed order ${order.orderCode} status to ${status}` });
 
-  // Notify vendor on delivery
+  // Notify vendor on delivery + auto-deduct from rider inventory
   if (status === "delivered") {
     const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, order.vendorId));
     if (vendor?.userId) {
       await createNotification({ userId: vendor.userId, title: "Order Delivered", message: `Order ${order.orderCode} has been delivered`, type: "order_delivered", relatedId: id });
+    }
+
+    // Auto-deduct from rider inventory: match by rider + productName/SKU
+    if (order.riderId) {
+      const riderInventories = await db.select().from(riderInventoryTable)
+        .where(eq(riderInventoryTable.riderId, order.riderId));
+
+      for (const inv of riderInventories) {
+        const [stockItem] = await db.select().from(stockTable).where(eq(stockTable.id, inv.stockId));
+        const nameMatch = stockItem && stockItem.productName.toLowerCase() === order.productName.toLowerCase();
+        const skuMatch = stockItem && order.productSku && stockItem.productSku && stockItem.productSku.toLowerCase() === order.productSku.toLowerCase();
+        if (nameMatch || skuMatch) {
+          const qty = order.quantity ?? 1;
+          const currentQty = inv.assignedQty - inv.deliveredQty - inv.returnedQty;
+          if (currentQty > 0) {
+            await db.update(riderInventoryTable)
+              .set({ deliveredQty: sql`${riderInventoryTable.deliveredQty} + ${Math.min(qty, currentQty)}` })
+              .where(eq(riderInventoryTable.id, inv.id));
+          }
+          break;
+        }
+      }
     }
   }
 

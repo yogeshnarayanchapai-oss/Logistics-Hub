@@ -63,6 +63,7 @@ function getNavItems(role: string): NavItem[] {
     return [
       { name: "Dashboard", href: "/rider/dashboard", icon: LayoutDashboard },
       { name: "Orders", href: "/rider/orders", icon: Package, badgeTypes: ["order_assigned", "new_comment"] },
+      { name: "My Inventory", href: "/rider/inventory", icon: ClipboardList },
       { name: "Support Tickets", href: "/rider/tickets", icon: Ticket },
     ];
   }

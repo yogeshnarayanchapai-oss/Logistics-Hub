@@ -13,3 +13,4 @@ export * from "./notifications";
 export * from "./audit_logs";
 export * from "./support_contacts";
 export * from "./app_settings";
+export * from "./rider_inventory";

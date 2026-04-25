@@ -23,6 +23,7 @@ import Riders from "@/pages/Riders";
 import Stations from "@/pages/Stations";
 import Users from "@/pages/Users";
 import Stock from "@/pages/Stock";
+import RiderInventory from "@/pages/RiderInventory";
 import Payments from "@/pages/Payments";
 import BankAccounts from "@/pages/BankAccounts";
 import TicketsList from "@/pages/tickets/TicketsList";
@@ -138,6 +139,7 @@ function Router() {
       <Route path="/rider/dashboard"><ProtectedRoute component={Dashboard} roles={[...RIDER_ROLES]} /></Route>
       <Route path="/rider/orders"><ProtectedRoute component={OrdersList} roles={[...RIDER_ROLES]} /></Route>
       <Route path="/rider/orders/:id"><ProtectedRoute component={OrderDetail} roles={[...RIDER_ROLES]} /></Route>
+      <Route path="/rider/inventory"><ProtectedRoute component={RiderInventory} roles={[...RIDER_ROLES]} /></Route>
       <Route path="/rider/tickets"><ProtectedRoute component={TicketsList} roles={[...RIDER_ROLES]} /></Route>
       <Route path="/rider/tickets/:id"><ProtectedRoute component={TicketDetail} roles={[...RIDER_ROLES]} /></Route>
       <Route path="/rider/notifications"><ProtectedRoute component={Notifications} roles={[...RIDER_ROLES]} /></Route>

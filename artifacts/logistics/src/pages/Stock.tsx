@@ -1,11 +1,11 @@
 import { useAuth } from "@/lib/auth";
-import { useListStock, useCreateStockEntry, useUpdateStockEntry, useDeleteStockEntry, useListVendors, getListStockQueryKey } from "@workspace/api-client-react";
+import { useListStock, useCreateStockEntry, useUpdateStockEntry, useDeleteStockEntry, useListVendors, useListRiders, getListStockQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, Package, Plus, Trash2, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Loader2, Search, Package, Plus, Trash2, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, UserCheck, Undo2, Truck } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -23,7 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
-type DialogMode = "add-product" | "stock-in" | "stock-out" | null;
+type DialogMode = "add-product" | "stock-in" | "stock-out" | "assign-inventory" | "return-inventory" | null;
 
 export default function Stock() {
   const { user } = useAuth();
@@ -54,8 +54,81 @@ export default function Stock() {
   const [activeEntry, setActiveEntry] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
+  // Rider inventory state
+  const [riderInventories, setRiderInventories] = useState<any[]>([]);
+  const [riderInvLoading, setRiderInvLoading] = useState(false);
+  const [assignPending, setAssignPending] = useState(false);
+  const [returnPending, setReturnPending] = useState(false);
+  const [returnEntry, setReturnEntry] = useState<any>(null);
+
+  const { data: riders } = useListRiders({ status: "active" });
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+  const authToken = () => localStorage.getItem("auth_token");
+
+  const fetchRiderInventories = useCallback(() => {
+    if (!canManage || isVendor) return;
+    setRiderInvLoading(true);
+    fetch(`${BASE}/api/rider-inventory`, { headers: { Authorization: `Bearer ${authToken()}` } })
+      .then(r => r.json()).then(d => setRiderInventories(Array.isArray(d) ? d : []))
+      .catch(() => setRiderInventories([]))
+      .finally(() => setRiderInvLoading(false));
+  }, [canManage, isVendor]);
+
+  useEffect(() => { fetchRiderInventories(); }, [fetchRiderInventories]);
+
+  const handleAssignInventory = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const riderId = fd.get("riderId") as string;
+    const stockId = fd.get("stockId") as string;
+    const qty = fd.get("qty") as string;
+    const note = fd.get("note") as string;
+    if (!riderId || !stockId || !qty || Number(qty) <= 0) {
+      toast({ title: "Fill all fields with a valid quantity", variant: "destructive" }); return;
+    }
+    setAssignPending(true);
+    try {
+      const res = await fetch(`${BASE}/api/rider-inventory/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
+        body: JSON.stringify({ riderId, stockId, qty: Number(qty), note }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      toast({ title: "Inventory assigned to rider" });
+      setDialogMode(null);
+      fetchRiderInventories();
+    } catch (err: any) {
+      toast({ title: err.message || "Assignment failed", variant: "destructive" });
+    } finally { setAssignPending(false); }
+  };
+
+  const handleReturnInventory = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const qty = fd.get("qty") as string;
+    if (!returnEntry || !qty || Number(qty) <= 0) {
+      toast({ title: "Enter a valid quantity", variant: "destructive" }); return;
+    }
+    setReturnPending(true);
+    try {
+      const res = await fetch(`${BASE}/api/rider-inventory/return`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
+        body: JSON.stringify({ entryId: returnEntry.id, qty: Number(qty) }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      toast({ title: "Inventory returned from rider" });
+      setDialogMode(null);
+      setReturnEntry(null);
+      fetchRiderInventories();
+    } catch (err: any) {
+      toast({ title: err.message || "Return failed", variant: "destructive" });
+    } finally { setReturnPending(false); }
+  };
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListStockQueryKey() });
 
@@ -124,9 +197,14 @@ export default function Stock() {
           <p className="text-muted-foreground">Monitor inventory levels by vendor and product.</p>
         </div>
         {canManage && (
-          <Button onClick={() => { setActiveEntry(null); setDialogMode("add-product"); }}>
-            <Plus className="mr-2 h-4 w-4" /> Add Product
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setDialogMode("assign-inventory")}>
+              <UserCheck className="mr-2 h-4 w-4" /> Assign Inventory
+            </Button>
+            <Button onClick={() => { setActiveEntry(null); setDialogMode("add-product"); }}>
+              <Plus className="mr-2 h-4 w-4" /> Add Product
+            </Button>
+          </div>
         )}
       </div>
 
@@ -379,6 +457,163 @@ export default function Stock() {
               <Button type="submit" variant="destructive" disabled={updateMutation.isPending}>
                 {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Confirm Stock Out
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Rider Inventory Section ── */}
+      {canManage && !isVendor && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Truck className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold">Rider Inventory</h3>
+            <span className="text-xs text-muted-foreground ml-1">— items currently held by riders</span>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {riderInvLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+              ) : riderInventories.length === 0 ? (
+                <div className="flex flex-col items-center py-10 text-center text-muted-foreground">
+                  <Package className="h-10 w-10 mb-2 opacity-20" />
+                  <p>No inventory has been assigned to riders yet.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Rider</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead className="text-center">Assigned</TableHead>
+                        <TableHead className="text-center">Delivered</TableHead>
+                        <TableHead className="text-center">Returned</TableHead>
+                        <TableHead className="text-center">In Hand</TableHead>
+                        <TableHead className="text-center">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {riderInventories.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
+                                {(entry.riderName || "R").charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium text-sm">{entry.riderName || `Rider #${entry.riderId}`}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{entry.productName}</div>
+                            {entry.productSku && <div className="text-xs text-muted-foreground">SKU: {entry.productSku}</div>}
+                          </TableCell>
+                          <TableCell className="text-center">{entry.assignedQty}</TableCell>
+                          <TableCell className="text-center text-green-700 font-medium">{entry.deliveredQty}</TableCell>
+                          <TableCell className="text-center text-orange-600 font-medium">{entry.returnedQty}</TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-bold ${entry.currentQty > 0 ? "text-blue-700" : "text-muted-foreground"}`}>
+                              {entry.currentQty}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {entry.currentQty > 0 && (
+                              <Button
+                                size="sm" variant="outline"
+                                onClick={() => { setReturnEntry(entry); setDialogMode("return-inventory"); }}
+                              >
+                                <Undo2 className="mr-1 h-3.5 w-3.5" /> Return
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Assign Inventory Dialog */}
+      <Dialog open={dialogMode === "assign-inventory"} onOpenChange={(open) => !open && setDialogMode(null)}>
+        <DialogContent className="sm:max-w-[440px]">
+          <form onSubmit={handleAssignInventory}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-primary">
+                <UserCheck className="h-5 w-5" /> Assign Inventory to Rider
+              </DialogTitle>
+              <DialogDescription>Select a rider and a product to assign stock for delivery.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="riderId">Rider *</Label>
+                <select name="riderId" id="riderId" required
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  <option value="">— Select rider —</option>
+                  {(riders ?? []).map((r: any) => (
+                    <option key={r.id} value={r.id}>{r.name} ({r.phone})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stockId">Product *</Label>
+                <select name="stockId" id="stockId" required
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  <option value="">— Select product —</option>
+                  {(rawEntries ?? []).filter(e => e.currentStock > 0).map((e: any) => (
+                    <option key={e.id} value={e.id}>{e.productName} {e.productSku ? `(${e.productSku})` : ""} — {e.currentStock} in stock</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="qty">Quantity *</Label>
+                <Input id="qty" name="qty" type="number" min="1" placeholder="e.g. 20" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="note">Note (optional)</Label>
+                <Input id="note" name="note" placeholder="e.g. For Kathmandu route" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
+              <Button type="submit" disabled={assignPending}>
+                {assignPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Assign
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Return Inventory Dialog */}
+      <Dialog open={dialogMode === "return-inventory"} onOpenChange={(open) => { if (!open) { setDialogMode(null); setReturnEntry(null); } }}>
+        <DialogContent className="sm:max-w-[380px]">
+          <form onSubmit={handleReturnInventory}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-orange-600">
+                <Undo2 className="h-5 w-5" /> Return Inventory
+              </DialogTitle>
+              <DialogDescription>
+                Rider: <strong>{returnEntry?.riderName}</strong><br />
+                Product: <strong>{returnEntry?.productName}</strong><br />
+                Currently in hand: <strong>{returnEntry?.currentQty}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="qty">Quantity to Return *</Label>
+                <Input id="qty" name="qty" type="number" min="1" max={returnEntry?.currentQty ?? 9999} placeholder="e.g. 5" required autoFocus />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setDialogMode(null); setReturnEntry(null); }}>Cancel</Button>
+              <Button type="submit" className="bg-orange-600 hover:bg-orange-700" disabled={returnPending}>
+                {returnPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Confirm Return
               </Button>
             </DialogFooter>
           </form>

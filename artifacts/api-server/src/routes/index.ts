@@ -14,6 +14,7 @@ import auditRouter from "./audit";
 import dashboardRouter from "./dashboard";
 import supportContactsRouter from "./support_contacts";
 import settingsRouter from "./settings";
+import riderInventoryRouter from "./rider-inventory";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(auditRouter);
 router.use(dashboardRouter);
 router.use(supportContactsRouter);
 router.use(settingsRouter);
+router.use(riderInventoryRouter);
 
 export default router;

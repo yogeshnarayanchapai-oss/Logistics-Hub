@@ -837,42 +837,35 @@ export default function Stock() {
                     ))}
                   </select>
                 </div>
-
-                {deassignRiderId && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Product *</Label>
-                      <select
-                        value={deassignEntryId}
-                        onChange={(e) => { setDeassignEntryId(e.target.value); setDeassignQty(""); }}
-                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">— Select product —</option>
-                        {riderInventories.filter(e => String(e.riderId) === deassignRiderId && e.currentQty > 0).map((e: any) => (
-                          <option key={e.id} value={e.id}>{e.productName}{e.productSku ? ` (${e.productSku})` : ""} — {e.currentQty} in hand</option>
-                        ))}
-                      </select>
-                    </div>
-                    {deassignEntryId && (
-                      <div className="space-y-2">
-                        <Label>
-                          Quantity to Return *
-                          {(() => {
-                            const entry = riderInventories.find(e => String(e.id) === deassignEntryId);
-                            return entry ? <span className="text-muted-foreground font-normal"> (max {entry.currentQty})</span> : null;
-                          })()}
-                        </Label>
-                        <Input
-                          type="number" min="1"
-                          max={riderInventories.find(e => String(e.id) === deassignEntryId)?.currentQty ?? 9999}
-                          placeholder="e.g. 5"
-                          value={deassignQty}
-                          onChange={(e) => setDeassignQty(e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
+                <div className="space-y-2">
+                  <Label>Product *</Label>
+                  <select
+                    value={deassignEntryId}
+                    onChange={(e) => { setDeassignEntryId(e.target.value); setDeassignQty(""); }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">— Select product —</option>
+                    {riderInventories.filter(e => (!deassignRiderId || String(e.riderId) === deassignRiderId) && e.currentQty > 0).map((e: any) => (
+                      <option key={e.id} value={e.id}>{e.productName}{e.productSku ? ` (${e.productSku})` : ""} — {e.currentQty} in hand</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    Quantity *
+                    {deassignEntryId && (() => {
+                      const entry = riderInventories.find(e => String(e.id) === deassignEntryId);
+                      return entry ? <span className="text-muted-foreground font-normal"> (max {entry.currentQty})</span> : null;
+                    })()}
+                  </Label>
+                  <Input
+                    type="number" min="1"
+                    max={riderInventories.find(e => String(e.id) === deassignEntryId)?.currentQty ?? 9999}
+                    placeholder="e.g. 5"
+                    value={deassignQty}
+                    onChange={(e) => setDeassignQty(e.target.value)}
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>

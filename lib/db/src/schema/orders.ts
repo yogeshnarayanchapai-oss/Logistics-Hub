@@ -30,6 +30,7 @@ export const ordersTable = pgTable("orders", {
   matchedOrderId: integer("matched_order_id"),
   duplicateConfidence: text("duplicate_confidence"),
   paymentReleaseStatus: text("payment_release_status").notNull().default("pending"),
+  paymentRequestId: integer("payment_request_id"),
   notes: text("notes"),
   internalNote: text("internal_note"),
   createdBy: integer("created_by"),

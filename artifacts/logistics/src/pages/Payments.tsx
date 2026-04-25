@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil, Truck, CheckCircle, XCircle, Eye, Package, Send } from "lucide-react";
+import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil, Truck, CheckCircle, XCircle, Eye, Package, Send, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -199,16 +199,68 @@ export default function Payments() {
     setViewAdminNote("");
     setViewOrders([]);
     setViewOrdersLoading(true);
-    fetch(`${BASE}/api/orders?vendorId=${payment.vendorId}&status=delivered&limit=200`, {
+    fetch(`${BASE}/api/payment-requests/${payment.id}/orders`, {
       headers: { Authorization: `Bearer ${authToken()}` }
     })
       .then(r => r.json())
-      .then(d => {
-        const orders = Array.isArray(d) ? d : (d?.orders ?? []);
-        setViewOrders(orders.filter((o: any) => o.paymentReleaseStatus === "pending"));
-      })
+      .then(d => setViewOrders(Array.isArray(d) ? d : []))
       .catch(() => setViewOrders([]))
       .finally(() => setViewOrdersLoading(false));
+  };
+
+  const downloadPaymentPdf = (payment: any, orders: any[]) => {
+    const totalCod = orders.reduce((s: number, o: any) => s + Number(o.codAmount), 0);
+    const totalDelivery = orders.reduce((s: number, o: any) => s + Number(o.deliveryCharge), 0);
+    const totalNet = orders.reduce((s: number, o: any) => s + Number(o.vendorPayable), 0);
+
+    const rows = orders.map((o: any, i: number) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${o.orderCode}</td>
+        <td>${o.customerName}<br/><small>${o.customerPhone}</small></td>
+        <td class="num">${Number(o.codAmount).toLocaleString()}</td>
+        <td class="num">${Number(o.deliveryCharge).toLocaleString()}</td>
+        <td class="num">${Number(o.vendorPayable).toLocaleString()}</td>
+        <td>${o.riderName ?? "—"}</td>
+      </tr>`).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+      <title>Payment Statement - ${payment.vendorName}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #111; }
+        h2 { margin: 0 0 4px; } p { margin: 2px 0; color: #555; }
+        .header { margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f3f4f6; text-align: left; padding: 6px 8px; border: 1px solid #d1d5db; font-size: 11px; }
+        td { padding: 5px 8px; border: 1px solid #e5e7eb; vertical-align: top; }
+        .num { text-align: right; }
+        tfoot td { font-weight: bold; background: #f9fafb; }
+        .meta { display: flex; gap: 40px; margin-top: 12px; font-size: 11px; }
+        .meta span { color: #6b7280; } .meta strong { color: #111; }
+      </style></head><body>
+      <div class="header">
+        <h2>Payment Statement</h2>
+        <p>Vendor: <strong>${payment.vendorName}</strong></p>
+        <p>Request Date: ${new Date(payment.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+        ${payment.referenceId ? `<p>Ref: ${payment.referenceId}</p>` : ""}
+        ${payment.paymentDate ? `<p>Payment Date: ${payment.paymentDate}</p>` : ""}
+      </div>
+      <table>
+        <thead><tr><th>SN</th><th>Order #</th><th>Customer</th><th class="num">COD</th><th class="num">Delivery Charge</th><th class="num">Net Payable</th><th>Rider</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td colspan="3">Total (${orders.length} orders)</td>
+          <td class="num">Rs. ${totalCod.toLocaleString()}</td>
+          <td class="num">Rs. ${totalDelivery.toLocaleString()}</td>
+          <td class="num">Rs. ${totalNet.toLocaleString()}</td>
+          <td></td>
+        </tr></tfoot>
+      </table>
+      <script>window.onload=()=>{window.print();}</script>
+      </body></html>`;
+
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
   };
 
   const [riderPayments, setRiderPayments] = useState<any[]>([]);
@@ -942,47 +994,64 @@ export default function Payments() {
                 </div>
               )}
 
-              {/* Linked Orders (pending COD release) */}
+              {/* Linked Orders — COD breakdown */}
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
-                  <Package className="h-3.5 w-3.5" /> Pending COD Orders (unpaid)
-                  {!viewOrdersLoading && (
-                    <span className="ml-1 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-xs font-bold">{viewOrders.length}</span>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                    <Package className="h-3.5 w-3.5" /> Order Breakdown
+                    {!viewOrdersLoading && viewOrders.length > 0 && (
+                      <span className="ml-1 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-xs font-bold">{viewOrders.length}</span>
+                    )}
+                  </p>
+                  {viewOrders.length > 0 && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                      onClick={() => downloadPaymentPdf(viewingPayment, viewOrders)}>
+                      <Download className="h-3 w-3" /> Download PDF
+                    </Button>
                   )}
-                </p>
+                </div>
                 {viewOrdersLoading ? (
                   <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
                 ) : viewOrders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-3">No pending COD orders found for this vendor.</p>
+                  <p className="text-sm text-muted-foreground text-center py-3">No orders linked to this payment request.</p>
                 ) : (
                   <div className="rounded-md border overflow-hidden">
-                    <div className="max-h-[220px] overflow-y-auto">
+                    <div className="max-h-[260px] overflow-y-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs py-2 w-8">SN</TableHead>
                             <TableHead className="text-xs py-2">Order #</TableHead>
                             <TableHead className="text-xs py-2">Customer</TableHead>
-                            <TableHead className="text-xs py-2">Product</TableHead>
-                            <TableHead className="text-xs py-2 text-right">COD Amount</TableHead>
+                            <TableHead className="text-xs py-2 text-right">COD</TableHead>
+                            <TableHead className="text-xs py-2 text-right">Delivery</TableHead>
+                            <TableHead className="text-xs py-2 text-right">Net</TableHead>
+                            <TableHead className="text-xs py-2">Rider</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {viewOrders.map((o: any) => (
+                          {viewOrders.map((o: any, idx: number) => (
                             <TableRow key={o.id} className="text-sm">
+                              <TableCell className="py-1.5 text-xs text-muted-foreground">{idx + 1}</TableCell>
                               <TableCell className="py-1.5 font-mono text-xs text-primary">{o.orderCode}</TableCell>
-                              <TableCell className="py-1.5">{o.customerName}</TableCell>
-                              <TableCell className="py-1.5 text-muted-foreground truncate max-w-[120px]">{o.productName}</TableCell>
-                              <TableCell className="py-1.5 text-right font-semibold">Rs. {Number(o.codAmount).toLocaleString()}</TableCell>
+                              <TableCell className="py-1.5 text-xs">
+                                <div>{o.customerName}</div>
+                                <div className="text-muted-foreground">{o.customerPhone}</div>
+                              </TableCell>
+                              <TableCell className="py-1.5 text-right text-xs">{Number(o.codAmount).toLocaleString()}</TableCell>
+                              <TableCell className="py-1.5 text-right text-xs text-red-600">-{Number(o.deliveryCharge).toLocaleString()}</TableCell>
+                              <TableCell className="py-1.5 text-right text-xs font-semibold text-emerald-700">{Number(o.vendorPayable).toLocaleString()}</TableCell>
+                              <TableCell className="py-1.5 text-xs text-muted-foreground">{o.riderName ?? "—"}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
-                    <div className="border-t bg-muted/30 px-3 py-2 flex justify-between text-sm">
-                      <span className="text-muted-foreground">{viewOrders.length} order{viewOrders.length !== 1 ? "s" : ""} total</span>
-                      <span className="font-bold text-primary">
-                        Total COD: Rs. {viewOrders.reduce((s: number, o: any) => s + Number(o.codAmount), 0).toLocaleString()}
-                      </span>
+                    <div className="border-t bg-muted/30 px-3 py-2 grid grid-cols-4 gap-1 text-xs">
+                      <span className="text-muted-foreground col-span-1">{viewOrders.length} order{viewOrders.length !== 1 ? "s" : ""}</span>
+                      <span className="text-right">COD: <strong>Rs. {viewOrders.reduce((s: number, o: any) => s + Number(o.codAmount), 0).toLocaleString()}</strong></span>
+                      <span className="text-right text-red-600">Delivery: <strong>-Rs. {viewOrders.reduce((s: number, o: any) => s + Number(o.deliveryCharge), 0).toLocaleString()}</strong></span>
+                      <span className="text-right text-emerald-700">Net: <strong>Rs. {viewOrders.reduce((s: number, o: any) => s + Number(o.vendorPayable), 0).toLocaleString()}</strong></span>
                     </div>
                   </div>
                 )}

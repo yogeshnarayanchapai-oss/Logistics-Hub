@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
-import { db, bankAccountsTable, paymentRequestsTable, vendorsTable, usersTable } from "@workspace/db";
+import { eq, and, gte, lte, desc, isNull } from "drizzle-orm";
+import { db, bankAccountsTable, paymentRequestsTable, vendorsTable, usersTable, ordersTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { createAuditLog } from "../lib/audit";
 import { createNotification } from "../lib/notifications";
@@ -170,6 +170,16 @@ router.post("/payment-requests", requireAuth, async (req, res): Promise<void> =>
     note: note ?? null,
   }).returning();
 
+  // Lock all the vendor's pending-payment delivered orders to this request
+  await db.update(ordersTable)
+    .set({ paymentRequestId: pr.id })
+    .where(and(
+      eq(ordersTable.vendorId, account.vendorId),
+      eq(ordersTable.status, "delivered"),
+      eq(ordersTable.paymentReleaseStatus, "pending"),
+      isNull(ordersTable.paymentRequestId)
+    ));
+
   await createAuditLog({ userId, action: "create", entity: "payment_request", entityId: pr.id, description: `Payment request Rs.${requestedAmount} submitted` });
 
   res.status(201).json(await formatPaymentRequest(pr));
@@ -181,6 +191,35 @@ router.get("/payment-requests/:id", requireAuth, async (req, res): Promise<void>
   const [pr] = await db.select().from(paymentRequestsTable).where(eq(paymentRequestsTable.id, id));
   if (!pr) { res.status(404).json({ error: "Not found" }); return; }
   res.json(await formatPaymentRequest(pr));
+});
+
+// GET /payment-requests/:id/orders — fetch orders linked to this payment request
+router.get("/payment-requests/:id/orders", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  const linkedOrders = await db.select().from(ordersTable).where(eq(ordersTable.paymentRequestId, id));
+
+  const result = await Promise.all(linkedOrders.map(async (o) => {
+    let riderName: string | null = null;
+    if (o.riderId) {
+      const [u] = await db.select().from(usersTable).where(eq(usersTable.id, o.riderId));
+      riderName = u?.name ?? null;
+    }
+    return {
+      id: o.id,
+      orderCode: o.orderCode,
+      customerName: o.customerName,
+      customerPhone: o.customerPhone,
+      productName: o.productName,
+      codAmount: Number(o.codAmount),
+      deliveryCharge: Number(o.deliveryCharge),
+      vendorPayable: Number(o.vendorPayable),
+      riderName,
+      paymentReleaseStatus: o.paymentReleaseStatus,
+      status: o.status,
+    };
+  }));
+
+  res.json(result);
 });
 
 router.patch("/payment-requests/:id", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
@@ -198,6 +237,13 @@ router.patch("/payment-requests/:id", requireAuth, requireRole("admin", "manager
 
   const [pr] = await db.update(paymentRequestsTable).set(updates as any).where(eq(paymentRequestsTable.id, id)).returning();
   if (!pr) { res.status(404).json({ error: "Not found" }); return; }
+
+  // On release: mark all linked orders as payment_released
+  if (status === "released") {
+    await db.update(ordersTable)
+      .set({ paymentReleaseStatus: "released" })
+      .where(eq(ordersTable.paymentRequestId, id));
+  }
 
   await createAuditLog({ userId, action: `payment_${status}`, entity: "payment_request", entityId: id, description: `Payment request ${status}` });
 

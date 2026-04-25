@@ -69,7 +69,7 @@ export default function Stock() {
   const { toast } = useToast();
 
   const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-  const authToken = () => localStorage.getItem("auth_token");
+  const authToken = () => localStorage.getItem("authToken");
 
   // ── Movements tab state ──
   const today = new Date().toISOString().split("T")[0];

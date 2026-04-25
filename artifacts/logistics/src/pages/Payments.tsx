@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil, Truck, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil, Truck, CheckCircle, XCircle, Eye, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -154,7 +154,28 @@ export default function Payments() {
 
   // ── Rider payment requests (admin/manager only) ──
   const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-  const authToken = () => localStorage.getItem("auth_token");
+  const authToken = () => localStorage.getItem("authToken");
+
+  // ── View Payment Request dialog ──
+  const [viewingPayment, setViewingPayment] = useState<any>(null);
+  const [viewOrders, setViewOrders] = useState<any[]>([]);
+  const [viewOrdersLoading, setViewOrdersLoading] = useState(false);
+
+  const openViewDialog = (payment: any) => {
+    setViewingPayment(payment);
+    setViewOrders([]);
+    setViewOrdersLoading(true);
+    fetch(`${BASE}/api/orders?vendorId=${payment.vendorId}&status=delivered&limit=200`, {
+      headers: { Authorization: `Bearer ${authToken()}` }
+    })
+      .then(r => r.json())
+      .then(d => {
+        const orders = Array.isArray(d) ? d : (d?.orders ?? []);
+        setViewOrders(orders.filter((o: any) => o.paymentReleaseStatus === "pending"));
+      })
+      .catch(() => setViewOrders([]))
+      .finally(() => setViewOrdersLoading(false));
+  };
 
   const [riderPayments, setRiderPayments] = useState<any[]>([]);
   const [riderPaymentsLoading, setRiderPaymentsLoading] = useState(false);
@@ -323,6 +344,9 @@ export default function Payments() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openViewDialog(payment)}>
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
                                     {payment.status === 'pending' && (
                                       <>
                                         <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(payment); setActionType('reject'); }}>Reject</Button>
@@ -440,6 +464,9 @@ export default function Payments() {
                             {!isVendor && (
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openViewDialog(payment)}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
                                   {payment.status === 'pending' && (
                                     <>
                                       <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(payment); setActionType('reject'); }}>Reject</Button>
@@ -760,6 +787,170 @@ export default function Payments() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Payment Request Dialog */}
+      <Dialog open={!!viewingPayment} onOpenChange={(open) => { if (!open) { setViewingPayment(null); setViewOrders([]); } }}>
+        <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              Payment Request Details
+            </DialogTitle>
+            <DialogDescription>
+              Submitted on {viewingPayment && format(new Date(viewingPayment.createdAt), "MMM d, yyyy 'at' h:mm a")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewingPayment && (
+            <div className="space-y-5 py-2">
+              {/* Party & Amount */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Vendor / Party</p>
+                  <p className="font-semibold text-base">{viewingPayment.vendorName}</p>
+                </div>
+                <div className="rounded-lg border bg-primary/5 p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Requested Amount</p>
+                  <p className="font-bold text-xl text-primary">Rs. {viewingPayment.requestedAmount.toLocaleString()}</p>
+                  {viewingPayment.approvedAmount && (
+                    <p className="text-xs text-emerald-700">Approved: Rs. {viewingPayment.approvedAmount.toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <Badge variant={
+                  viewingPayment.status === 'pending' ? 'secondary' :
+                  viewingPayment.status === 'approved' ? 'default' :
+                  viewingPayment.status === 'released' ? 'outline' : 'destructive'
+                } className={viewingPayment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 capitalize' : 'capitalize'}>
+                  {viewingPayment.status === 'released' && <CheckCircle className="mr-1 h-3 w-3" />}
+                  {viewingPayment.status}
+                </Badge>
+                {viewingPayment.reviewedByName && (
+                  <span className="text-xs text-muted-foreground">by {viewingPayment.reviewedByName}</span>
+                )}
+              </div>
+
+              {/* Bank Account Details */}
+              <div className="rounded-lg border p-4 space-y-2">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                  <Building className="h-3.5 w-3.5" /> Bank / Wallet Details
+                </p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Bank Name:</span>{" "}
+                    <span className="font-medium">{viewingPayment.bankName ?? "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Account Holder:</span>{" "}
+                    <span className="font-medium">{viewingPayment.accountHolderName ?? "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Account No:</span>{" "}
+                    <span className="font-mono font-semibold">{viewingPayment.accountNumber ?? "—"}</span>
+                  </div>
+                  {viewingPayment.bankBranch && (
+                    <div>
+                      <span className="text-muted-foreground">Branch:</span>{" "}
+                      <span className="font-medium">{viewingPayment.bankBranch}</span>
+                    </div>
+                  )}
+                  {viewingPayment.walletMethod && (
+                    <div>
+                      <span className="text-muted-foreground">Wallet:</span>{" "}
+                      <span className="font-medium">{viewingPayment.walletMethod}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Vendor note */}
+              {viewingPayment.note && (
+                <div className="rounded-lg border bg-yellow-50 border-yellow-100 px-3 py-2 text-sm text-yellow-800">
+                  <span className="font-medium">Vendor Note:</span> {viewingPayment.note}
+                </div>
+              )}
+
+              {/* Release Info */}
+              {viewingPayment.status === 'released' && viewingPayment.referenceId && (
+                <div className="rounded-lg border bg-emerald-50 border-emerald-100 px-3 py-2 text-sm text-emerald-800 space-y-1">
+                  <div><span className="font-medium">Txn Ref:</span> {viewingPayment.referenceId}</div>
+                  {viewingPayment.paymentDate && <div><span className="font-medium">Transfer Date:</span> {viewingPayment.paymentDate}</div>}
+                  {viewingPayment.releaseNote && <div><span className="font-medium">Note:</span> {viewingPayment.releaseNote}</div>}
+                </div>
+              )}
+
+              {/* Linked Orders (pending COD release) */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                  <Package className="h-3.5 w-3.5" /> Pending COD Orders (unpaid)
+                  {!viewOrdersLoading && (
+                    <span className="ml-1 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-xs font-bold">{viewOrders.length}</span>
+                  )}
+                </p>
+                {viewOrdersLoading ? (
+                  <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+                ) : viewOrders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">No pending COD orders found for this vendor.</p>
+                ) : (
+                  <div className="rounded-md border overflow-hidden">
+                    <div className="max-h-[220px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs py-2">Order #</TableHead>
+                            <TableHead className="text-xs py-2">Customer</TableHead>
+                            <TableHead className="text-xs py-2">Product</TableHead>
+                            <TableHead className="text-xs py-2 text-right">COD Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {viewOrders.map((o: any) => (
+                            <TableRow key={o.id} className="text-sm">
+                              <TableCell className="py-1.5 font-mono text-xs text-primary">{o.orderCode}</TableCell>
+                              <TableCell className="py-1.5">{o.customerName}</TableCell>
+                              <TableCell className="py-1.5 text-muted-foreground truncate max-w-[120px]">{o.productName}</TableCell>
+                              <TableCell className="py-1.5 text-right font-semibold">Rs. {Number(o.codAmount).toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="border-t bg-muted/30 px-3 py-2 flex justify-between text-sm">
+                      <span className="text-muted-foreground">{viewOrders.length} order{viewOrders.length !== 1 ? "s" : ""} total</span>
+                      <span className="font-bold text-primary">
+                        Total COD: Rs. {viewOrders.reduce((s: number, o: any) => s + Number(o.codAmount), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="outline" onClick={() => { setViewingPayment(null); setViewOrders([]); }}>Close</Button>
+            {viewingPayment?.status === 'pending' && (
+              <div className="flex gap-2">
+                <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(viewingPayment); setActionType('reject'); setViewingPayment(null); }}>
+                  Reject
+                </Button>
+                <Button onClick={() => { setSelectedPayment(viewingPayment); setActionType('approve'); setViewingPayment(null); }}>
+                  Approve
+                </Button>
+              </div>
+            )}
+            {viewingPayment?.status === 'approved' && (
+              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setSelectedPayment(viewingPayment); setActionType('release'); setViewingPayment(null); }}>
+                Mark Released
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

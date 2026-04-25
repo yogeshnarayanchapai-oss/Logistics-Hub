@@ -101,6 +101,8 @@ export default function Stations() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [expandedAreas, setExpandedAreas] = useState<Set<number>>(new Set());
+  const AREA_PREVIEW = 3;
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -225,11 +227,35 @@ export default function Stations() {
                         </TableCell>
                         <TableCell className="max-w-[220px]">
                           {(station as any).areaCoverage
-                            ? <div className="flex flex-wrap gap-1">
-                                {(station as any).areaCoverage.split(",").map((a: string) => a.trim()).filter(Boolean).map((a: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs font-normal">{a}</Badge>
-                                ))}
-                              </div>
+                            ? (() => {
+                                const areas = (station as any).areaCoverage.split(",").map((a: string) => a.trim()).filter(Boolean);
+                                const isExpanded = expandedAreas.has(station.id);
+                                const visible = isExpanded ? areas : areas.slice(0, AREA_PREVIEW);
+                                const remaining = areas.length - AREA_PREVIEW;
+                                return (
+                                  <div className="flex flex-wrap gap-1 items-center">
+                                    {visible.map((a: string, i: number) => (
+                                      <Badge key={i} variant="secondary" className="text-xs font-normal">{a}</Badge>
+                                    ))}
+                                    {!isExpanded && remaining > 0 && (
+                                      <button
+                                        onClick={() => setExpandedAreas(prev => { const s = new Set(prev); s.add(station.id); return s; })}
+                                        className="text-xs text-primary hover:underline whitespace-nowrap"
+                                      >
+                                        +{remaining} more
+                                      </button>
+                                    )}
+                                    {isExpanded && areas.length > AREA_PREVIEW && (
+                                      <button
+                                        onClick={() => setExpandedAreas(prev => { const s = new Set(prev); s.delete(station.id); return s; })}
+                                        className="text-xs text-muted-foreground hover:underline whitespace-nowrap"
+                                      >
+                                        less
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()
                             : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-right font-medium">

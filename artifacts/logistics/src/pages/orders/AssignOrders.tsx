@@ -62,7 +62,7 @@ function AssignButton({
   const searchQ = riderSearch.trim().toLowerCase();
   const { suggested, rest } = (riders ?? []).reduce(
     (acc, r) => {
-      if (searchQ && !r.name.toLowerCase().includes(searchQ) && !(r.stationName ?? "").toLowerCase().includes(searchQ)) return acc;
+      if (searchQ && !r.name.toLowerCase().includes(searchQ) && !(r.stationName ?? "").toLowerCase().includes(searchQ) && !((r as any).coverageArea ?? "").toLowerCase().includes(searchQ)) return acc;
       if (matchesCoverage((r as any).coverageArea, orderLocation)) {
         acc.suggested.push(r);
       } else {
@@ -106,7 +106,7 @@ function AssignButton({
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input
                 autoFocus
-                placeholder="Search rider…"
+                placeholder="Search by name, station, area…"
                 value={riderSearch}
                 onChange={e => setRiderSearch(e.target.value)}
                 className="w-full pl-8 pr-7 py-2 text-sm bg-background outline-none placeholder:text-muted-foreground"

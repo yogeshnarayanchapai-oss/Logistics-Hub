@@ -44,15 +44,8 @@ function getNavItems(role: string): NavItem[] {
     return [
       { name: "Dashboard", href: "/vendor/dashboard", icon: LayoutDashboard },
       { name: "My Orders", href: "/vendor/orders", icon: Package },
-      { name: "New Order", href: "/vendor/orders/new", icon: ClipboardList },
-      { name: "Bulk Order", href: "/vendor/orders/bulk", icon: Copy },
       { name: "Stock Inventory", href: "/vendor/stock", icon: Package },
       { name: "Payments", href: "/vendor/payments", icon: Wallet },
-      {
-        name: "Bank Accounts",
-        href: "/vendor/bank-accounts",
-        icon: CreditCard,
-      },
       { name: "My Reports", href: "/vendor/reports", icon: BarChart2 },
       {
         name: "Today's Comments",

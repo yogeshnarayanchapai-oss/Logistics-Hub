@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useListPaymentRequests, useCreatePaymentRequest, useUpdatePaymentRequest, useGetCodSummary, useListBankAccounts, getListPaymentRequestsQueryKey, getGetCodSummaryQueryKey } from "@workspace/api-client-react";
+import { useListPaymentRequests, useCreatePaymentRequest, useUpdatePaymentRequest, useGetCodSummary, useListBankAccounts, useCreateBankAccount, useUpdateBankAccount, getListPaymentRequestsQueryKey, getGetCodSummaryQueryKey, getListBankAccountsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, DollarSign, Wallet } from "lucide-react";
+import { Loader2, Plus, DollarSign, Wallet, CreditCard, Building, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -22,13 +22,18 @@ export default function Payments() {
   
   const { data: payments, isLoading } = useListPaymentRequests({ vendorId });
   const { data: codSummary } = useGetCodSummary({ query: { vendorId } });
-  const { data: bankAccounts } = useListBankAccounts({ vendorId }, { query: { enabled: isVendor } });
+  const { data: bankAccounts, isLoading: bankAccountsLoading } = useListBankAccounts({ vendorId }, { query: { enabled: isVendor } });
 
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
   const [requestNote, setRequestNote] = useState("");
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | "release" | null>(null);
+
+  // Bank account management state
+  const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
+  const [bankFormOpen, setBankFormOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -51,6 +56,28 @@ export default function Payments() {
         toast({ title: "Payment status updated" });
         setSelectedPayment(null);
         setActionType(null);
+      }
+    }
+  });
+
+  const createBankMutation = useCreateBankAccount({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBankAccountsQueryKey() });
+        toast({ title: "Bank account added successfully" });
+        setBankFormOpen(false);
+        setEditingAccount(null);
+      }
+    }
+  });
+
+  const updateBankMutation = useUpdateBankAccount({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBankAccountsQueryKey() });
+        toast({ title: "Bank account updated successfully" });
+        setBankFormOpen(false);
+        setEditingAccount(null);
       }
     }
   });
@@ -92,6 +119,38 @@ export default function Payments() {
     updateMutation.mutate({ id: selectedPayment.id, data });
   };
 
+  const handleBankSave = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      vendorId: isVendor && user.vendorId ? user.vendorId : Number(formData.get("vendorId")),
+      accountHolderName: formData.get("accountHolderName") as string,
+      bankName: formData.get("bankName") as string,
+      branch: (formData.get("branch") as string) || null,
+      accountNumber: formData.get("accountNumber") as string,
+      walletMethod: (formData.get("walletMethod") as string) || null,
+      remarks: (formData.get("remarks") as string) || null,
+      isDefault: formData.get("isDefault") === "on",
+    };
+
+    if (editingAccount) {
+      const { vendorId: _, ...updateData } = data;
+      updateBankMutation.mutate({ id: editingAccount.id, data: updateData });
+    } else {
+      createBankMutation.mutate({ data });
+    }
+  };
+
+  const openAddBankForm = () => {
+    setEditingAccount(null);
+    setBankFormOpen(true);
+  };
+
+  const openEditBankForm = (account: any) => {
+    setEditingAccount(account);
+    setBankFormOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -100,9 +159,14 @@ export default function Payments() {
           <p className="text-muted-foreground">Manage COD releases and payment requests.</p>
         </div>
         {isVendor && (
-          <Button onClick={openRequestDialog} disabled={!codSummary || codSummary.pendingRelease <= 0}>
-            <Plus className="mr-2 h-4 w-4" /> Request Payment
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setIsBankDialogOpen(true)}>
+              <CreditCard className="mr-2 h-4 w-4" /> Manage Bank Accounts
+            </Button>
+            <Button onClick={openRequestDialog} disabled={!codSummary || codSummary.pendingRelease <= 0}>
+              <Plus className="mr-2 h-4 w-4" /> Request Payment
+            </Button>
+          </div>
         )}
       </div>
 
@@ -244,7 +308,7 @@ export default function Payments() {
                   </Select>
                 ) : (
                   <p className="text-sm text-destructive">
-                    No bank accounts linked. Please add one in your Profile first.
+                    No bank accounts linked. Please add one using "Manage Bank Accounts".
                   </p>
                 )}
               </div>
@@ -280,6 +344,110 @@ export default function Payments() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Accounts Management Dialog */}
+      <Dialog open={isBankDialogOpen} onOpenChange={(open) => { setIsBankDialogOpen(open); if (!open) { setBankFormOpen(false); setEditingAccount(null); } }}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Bank Accounts
+            </DialogTitle>
+            <DialogDescription>Your linked accounts for COD remittance.</DialogDescription>
+          </DialogHeader>
+
+          {!bankFormOpen ? (
+            <>
+              <div className="space-y-3 max-h-72 overflow-y-auto">
+                {bankAccountsLoading ? (
+                  <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+                ) : bankAccounts && bankAccounts.length > 0 ? (
+                  bankAccounts.map((account: any) => (
+                    <div key={account.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Building className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <div>
+                          <div className="font-medium text-sm flex items-center gap-2">
+                            {account.bankName}
+                            {account.isDefault && (
+                              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">Default</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {account.accountHolderName} · {account.accountNumber}
+                            {account.branch ? ` · ${account.branch}` : ""}
+                          </div>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => openEditBankForm(account)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">No bank accounts added yet.</p>
+                )}
+              </div>
+              <DialogFooter className="sm:justify-between">
+                <Button variant="outline" onClick={openAddBankForm}>
+                  <Plus className="mr-2 h-4 w-4" /> Add New Account
+                </Button>
+                <Button variant="ghost" onClick={() => setIsBankDialogOpen(false)}>Close</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <form onSubmit={handleBankSave}>
+              <div className="grid gap-4 py-2">
+                <h3 className="font-medium text-sm">{editingAccount ? "Edit Account" : "New Bank Account"}</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Bank / Wallet Name *</Label>
+                  <Input id="bankName" name="bankName" defaultValue={editingAccount?.bankName} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accountHolderName">Account Holder Name *</Label>
+                  <Input id="accountHolderName" name="accountHolderName" defaultValue={editingAccount?.accountHolderName} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accountNumber">Account Number *</Label>
+                  <Input id="accountNumber" name="accountNumber" defaultValue={editingAccount?.accountNumber} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="branch">Branch</Label>
+                    <Input id="branch" name="branch" defaultValue={editingAccount?.branch} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="walletMethod">Wallet Method</Label>
+                    <Input id="walletMethod" name="walletMethod" defaultValue={editingAccount?.walletMethod} />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isDefault"
+                    name="isDefault"
+                    defaultChecked={editingAccount?.isDefault}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="isDefault" className="font-normal cursor-pointer">Set as default account for payments</Label>
+                </div>
+              </div>
+              <DialogFooter className="sm:justify-between mt-4">
+                <Button type="button" variant="ghost" onClick={() => { setBankFormOpen(false); setEditingAccount(null); }}>
+                  ← Back
+                </Button>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsBankDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={createBankMutation.isPending || updateBankMutation.isPending}>
+                    {(createBankMutation.isPending || updateBankMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 

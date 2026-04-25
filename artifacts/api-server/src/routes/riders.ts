@@ -31,6 +31,7 @@ async function formatRider(r: typeof ridersTable.$inferSelect) {
     stationId: r.stationId,
     stationName,
     status: r.status,
+    coverageArea: r.coverageArea ?? null,
     userId: r.userId,
     assignedCount: Number(assignedResult.count),
     deliveredToday: Number(deliveredResult.count),
@@ -53,7 +54,7 @@ router.get("/riders", requireAuth, async (req, res): Promise<void> => {
 
 router.post("/riders", requireAuth, requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const actorId = (req as any).userId as number;
-  const { name, email, phone, vehicleNumber, stationId, password } = req.body;
+  const { name, email, phone, vehicleNumber, stationId, password, coverageArea } = req.body;
   if (!name || !email) { res.status(400).json({ error: "name and email required" }); return; }
 
   // Check if a user already exists with this email
@@ -85,6 +86,7 @@ router.post("/riders", requireAuth, requireRole("admin", "manager"), async (req,
   const [rider] = await db.insert(ridersTable).values({
     name, email, phone, vehicleNumber,
     stationId: stationId ?? null,
+    coverageArea: coverageArea || null,
     userId: linkedUserId,
   }).returning();
 
@@ -106,13 +108,14 @@ router.patch("/riders/:id", requireAuth, requireRole("admin", "manager"), async 
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const updates: Record<string, unknown> = {};
-  const { name, email, phone, vehicleNumber, stationId, status } = req.body;
+  const { name, email, phone, vehicleNumber, stationId, status, coverageArea } = req.body;
   if (name) updates.name = name;
   if (email) updates.email = email;
   if (phone !== undefined) updates.phone = phone;
   if (vehicleNumber !== undefined) updates.vehicleNumber = vehicleNumber;
   if (stationId !== undefined) updates.stationId = stationId;
   if (status) updates.status = status;
+  if (coverageArea !== undefined) updates.coverageArea = coverageArea || null;
   const [rider] = await db.update(ridersTable).set(updates as any).where(eq(ridersTable.id, id)).returning();
   if (!rider) { res.status(404).json({ error: "Rider not found" }); return; }
 

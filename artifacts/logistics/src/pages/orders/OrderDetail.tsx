@@ -8,13 +8,15 @@ import { format } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, ArrowLeft, Send, MapPin, Package, User, Clock, AlertTriangle } from "lucide-react";
+import { Loader2, ArrowLeft, Send, MapPin, Package, User, Clock, AlertTriangle, Star } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -228,18 +230,49 @@ export default function OrderDetail() {
                 </Select>
               )}
 
-              {["admin", "manager", "station"].includes(user?.role || "") && (
-                <Select onValueChange={handleAssignRider} value={order.riderId?.toString() || ""}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Assign Rider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {riders?.map(r => (
-                      <SelectItem key={r.id} value={r.id.toString()}>{r.name} ({r.assignedCount} assigned)</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              {["admin", "manager", "station"].includes(user?.role || "") && (() => {
+                const orderAreaText = [order.area, order.city, order.district, order.address]
+                  .filter(Boolean).join(" ").toLowerCase();
+                const suggested = (riders ?? []).filter(r => {
+                  if (!r.coverageArea) return false;
+                  return r.coverageArea.split(",").map(k => k.trim().toLowerCase()).some(kw => kw && orderAreaText.includes(kw));
+                });
+                const others = (riders ?? []).filter(r => !suggested.find(s => s.id === r.id));
+                return (
+                  <Select onValueChange={handleAssignRider} value={order.riderId?.toString() || ""}>
+                    <SelectTrigger className="w-[210px]">
+                      <SelectValue placeholder="Assign Rider" />
+                      {suggested.length > 0 && !order.riderId && (
+                        <span className="ml-1 flex items-center gap-0.5 text-xs text-amber-600 font-medium">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />{suggested.length}
+                        </span>
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suggested.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="flex items-center gap-1 text-amber-700">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Suggested for this area
+                          </SelectLabel>
+                          {suggested.map(r => (
+                            <SelectItem key={r.id} value={r.id.toString()}>
+                              ⭐ {r.name} ({r.assignedCount} assigned)
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {others.length > 0 && (
+                        <SelectGroup>
+                          {suggested.length > 0 && <SelectLabel className="text-muted-foreground">Other Riders</SelectLabel>}
+                          {others.map(r => (
+                            <SelectItem key={r.id} value={r.id.toString()}>{r.name} ({r.assignedCount} assigned)</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
             </>
           )}
         </div>

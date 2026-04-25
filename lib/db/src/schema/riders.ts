@@ -10,6 +10,7 @@ export const ridersTable = pgTable("riders", {
   vehicleNumber: text("vehicle_number"),
   stationId: integer("station_id"),
   status: text("status").notNull().default("active"),
+  coverageArea: text("coverage_area"),
   userId: integer("user_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

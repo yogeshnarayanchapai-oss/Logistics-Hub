@@ -60,7 +60,8 @@ export default function Riders() {
       phone: formData.get("phone") as string || null,
       vehicleNumber: formData.get("vehicleNumber") as string || null,
       stationId: formData.get("stationId") ? Number(formData.get("stationId")) : null,
-      status: formData.get("status") as string || "active"
+      status: formData.get("status") as string || "active",
+      coverageArea: (formData.get("coverageArea") as string)?.trim() || null,
     };
     if (!editingRider) {
       data.password = formData.get("password") as string;
@@ -265,6 +266,18 @@ export default function Riders() {
                     </select>
                   </div>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="coverageArea">Coverage Area</Label>
+                <textarea
+                  id="coverageArea"
+                  name="coverageArea"
+                  defaultValue={editingRider?.coverageArea || ""}
+                  rows={2}
+                  placeholder="e.g. Kathmandu, Baneshwor, Koteshwor, New Baneshwor"
+                  className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                />
+                <p className="text-xs text-muted-foreground">Enter area keywords separated by commas. Riders will be suggested when order areas match.</p>
               </div>
               {!editingRider && (
                 <div className="space-y-2">

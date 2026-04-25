@@ -262,162 +262,170 @@ export default function Payments() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Payment Requests</CardTitle>
-          <CardDescription>History of all payment requests and their status.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    {!isVendor && <TableHead>Vendor</TableHead>}
-                    <TableHead>Account Info</TableHead>
-                    <TableHead className="text-right">Requested</TableHead>
-                    <TableHead className="text-right">Approved</TableHead>
-                    <TableHead>Status</TableHead>
-                    {!isVendor && <TableHead className="text-right">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payments?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={isVendor ? 5 : 7} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
-                    </TableRow>
-                  ) : (
-                    payments?.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-medium">
-                          {format(new Date(payment.createdAt), "MMM d, yyyy")}
-                        </TableCell>
-                        {!isVendor && <TableCell>{payment.vendorName}</TableCell>}
-                        <TableCell>
-                          <div className="text-sm max-w-[200px] truncate">{payment.bankAccountInfo}</div>
-                          {payment.referenceId && <div className="text-xs text-muted-foreground">Ref: {payment.referenceId}</div>}
-                        </TableCell>
-                        <TableCell className="text-right">Rs. {payment.requestedAmount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          {payment.approvedAmount ? `Rs. ${payment.approvedAmount.toLocaleString()}` : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            payment.status === 'pending' ? 'secondary' : 
-                            payment.status === 'approved' ? 'default' : 
-                            payment.status === 'released' ? 'outline' : 'destructive'
-                          } className={payment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
-                            {payment.status}
-                          </Badge>
-                        </TableCell>
-                        {!isVendor && (
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              {payment.status === 'pending' && (
-                                <>
-                                  <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(payment); setActionType('reject'); }}>Reject</Button>
-                                  <Button size="sm" onClick={() => { setSelectedPayment(payment); setActionType('approve'); }}>Approve</Button>
-                                </>
-                              )}
-                              {payment.status === 'approved' && (
-                                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setSelectedPayment(payment); setActionType('release'); }}>Mark Released</Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+      <Tabs defaultValue="vendor">
+        <TabsList>
+          <TabsTrigger value="vendor"><DollarSign className="mr-1.5 h-4 w-4" /> Vendor Payments</TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="rider"><Truck className="mr-1.5 h-4 w-4" /> Rider Commissions</TabsTrigger>
           )}
-        </CardContent>
-      </Card>
+        </TabsList>
 
-      {/* ── Rider Commission Payments (Admin/Manager) ── */}
-      {isAdmin && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Rider Commission Payments</h3>
-          </div>
+        {/* ── Vendor Payment Requests ── */}
+        <TabsContent value="vendor" className="mt-4">
           <Card>
-            <CardContent className="p-0">
-              {riderPaymentsLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-              ) : riderPayments.length === 0 ? (
-                <div className="flex flex-col items-center py-12 text-muted-foreground">
-                  <Truck className="h-10 w-10 mb-2 opacity-20" />
-                  <p>No rider payment requests yet.</p>
-                </div>
+            <CardHeader>
+              <CardTitle>Payment Requests</CardTitle>
+              <CardDescription>History of all payment requests and their status.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Rider</TableHead>
-                        <TableHead>Bank</TableHead>
+                        <TableHead>Date</TableHead>
+                        {!isVendor && <TableHead>Vendor</TableHead>}
+                        <TableHead>Account Info</TableHead>
                         <TableHead className="text-right">Requested</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Ref / Date</TableHead>
-                        <TableHead>Requested On</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        {!isVendor && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {riderPayments.map(rp => (
-                        <TableRow key={rp.id}>
-                          <TableCell>
-                            <div className="font-medium">{rp.riderName}</div>
-                            <div className="text-xs text-muted-foreground">{rp.riderEmail}</div>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <div>{rp.bankName}</div>
-                            <div className="text-muted-foreground text-xs">{rp.accountNumber}</div>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">Rs. {rp.requestedAmount.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{rp.approvedAmount ? `Rs. ${rp.approvedAmount.toLocaleString()}` : "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={riderPaymentStatusColor[rp.status] ?? ""}>
-                              {rp.status === "released" && <CheckCircle className="mr-1 h-3 w-3" />}
-                              {rp.status === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
-                              {rp.status.charAt(0).toUpperCase() + rp.status.slice(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {rp.referenceId ? <div>Ref: {rp.referenceId}</div> : "—"}
-                            {rp.paymentDate && <div className="text-xs">{rp.paymentDate}</div>}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{format(new Date(rp.createdAt), "MMM d, yyyy")}</TableCell>
-                          <TableCell className="text-right">
-                            {rp.status === "pending" && (
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
-                                  onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
-                                  Reject
-                                </Button>
-                                <Button size="sm"
-                                  onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
-                                  Release
-                                </Button>
-                              </div>
-                            )}
-                          </TableCell>
+                      {payments?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={isVendor ? 5 : 7} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        payments?.map((payment) => (
+                          <TableRow key={payment.id}>
+                            <TableCell className="font-medium">
+                              {format(new Date(payment.createdAt), "MMM d, yyyy")}
+                            </TableCell>
+                            {!isVendor && <TableCell>{payment.vendorName}</TableCell>}
+                            <TableCell>
+                              <div className="text-sm max-w-[200px] truncate">{payment.bankAccountInfo}</div>
+                              {payment.referenceId && <div className="text-xs text-muted-foreground">Ref: {payment.referenceId}</div>}
+                            </TableCell>
+                            <TableCell className="text-right">Rs. {payment.requestedAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">
+                              {payment.approvedAmount ? `Rs. ${payment.approvedAmount.toLocaleString()}` : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={
+                                payment.status === 'pending' ? 'secondary' :
+                                payment.status === 'approved' ? 'default' :
+                                payment.status === 'released' ? 'outline' : 'destructive'
+                              } className={payment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
+                                {payment.status}
+                              </Badge>
+                            </TableCell>
+                            {!isVendor && (
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  {payment.status === 'pending' && (
+                                    <>
+                                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setSelectedPayment(payment); setActionType('reject'); }}>Reject</Button>
+                                      <Button size="sm" onClick={() => { setSelectedPayment(payment); setActionType('approve'); }}>Approve</Button>
+                                    </>
+                                  )}
+                                  {payment.status === 'approved' && (
+                                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setSelectedPayment(payment); setActionType('release'); }}>Mark Released</Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
               )}
             </CardContent>
           </Card>
-        </div>
-      )}
+        </TabsContent>
+
+        {/* ── Rider Commission Payments ── */}
+        {isAdmin && (
+          <TabsContent value="rider" className="mt-4">
+            <Card>
+              <CardContent className="p-0">
+                {riderPaymentsLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+                ) : riderPayments.length === 0 ? (
+                  <div className="flex flex-col items-center py-12 text-muted-foreground">
+                    <Truck className="h-10 w-10 mb-2 opacity-20" />
+                    <p>No rider payment requests yet.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Rider</TableHead>
+                          <TableHead>Bank</TableHead>
+                          <TableHead className="text-right">Requested</TableHead>
+                          <TableHead className="text-right">Approved</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Ref / Date</TableHead>
+                          <TableHead>Requested On</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {riderPayments.map(rp => (
+                          <TableRow key={rp.id}>
+                            <TableCell>
+                              <div className="font-medium">{rp.riderName}</div>
+                              <div className="text-xs text-muted-foreground">{rp.riderEmail}</div>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <div>{rp.bankName}</div>
+                              <div className="text-muted-foreground text-xs">{rp.accountNumber}</div>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">Rs. {rp.requestedAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{rp.approvedAmount ? `Rs. ${rp.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={riderPaymentStatusColor[rp.status] ?? ""}>
+                                {rp.status === "released" && <CheckCircle className="mr-1 h-3 w-3" />}
+                                {rp.status === "rejected" && <XCircle className="mr-1 h-3 w-3" />}
+                                {rp.status.charAt(0).toUpperCase() + rp.status.slice(1)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {rp.referenceId ? <div>Ref: {rp.referenceId}</div> : "—"}
+                              {rp.paymentDate && <div className="text-xs">{rp.paymentDate}</div>}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{format(new Date(rp.createdAt), "MMM d, yyyy")}</TableCell>
+                            <TableCell className="text-right">
+                              {rp.status === "pending" && (
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
+                                    onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("reject"); setRiderReleaseDialogOpen(true); }}>
+                                    Reject
+                                  </Button>
+                                  <Button size="sm"
+                                    onClick={() => { setSelectedRiderPayment(rp); setRiderActionType("release"); setRiderReleaseDialogOpen(true); }}>
+                                    Release
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
 
       {/* Rider Payment Release/Reject Dialog */}
       <Dialog open={riderReleaseDialogOpen} onOpenChange={open => { if (!open) { setRiderReleaseDialogOpen(false); setSelectedRiderPayment(null); setRiderActionType(null); } }}>

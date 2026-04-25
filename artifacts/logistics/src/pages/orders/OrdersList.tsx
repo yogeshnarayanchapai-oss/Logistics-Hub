@@ -22,7 +22,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Loader2, Plus, Search, X, Pencil, Trash2, MoreHorizontal, Eye, UserCheck, MessageSquare } from "lucide-react";
+import { Loader2, Plus, Search, X, Pencil, Trash2, MoreHorizontal, Eye, UserCheck, MessageSquare, ArrowDownNarrowWide } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -153,7 +153,9 @@ export default function OrdersList() {
   const { data, isLoading } = useListOrders(queryParams);
   const deleteMutation = useDeleteOrder();
 
-  const orders = data?.orders ?? [];
+  const orders = [...(data?.orders ?? [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
   const allPageIds = orders.map((o) => o.id);
   const allChecked = allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
   const someChecked = allPageIds.some((id) => selectedIds.has(id));
@@ -365,7 +367,11 @@ export default function OrdersList() {
                       </TableHead>
                     )}
                     <TableHead>Order Code</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        Date <ArrowDownNarrowWide className="h-3.5 w-3.5 text-muted-foreground" />
+                      </span>
+                    </TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>COD Amount</TableHead>

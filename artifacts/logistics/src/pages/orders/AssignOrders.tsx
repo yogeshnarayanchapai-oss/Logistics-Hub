@@ -15,7 +15,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Loader2, Search, X, UserCheck } from "lucide-react";
+import { Loader2, Search, X, UserCheck, ArrowDownNarrowWide } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -112,7 +112,9 @@ export default function AssignOrders() {
 
   const assignMutation = useAssignOrder();
 
-  const orders = data?.orders ?? [];
+  const orders = [...(data?.orders ?? [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
   const allPageIds = orders.map((o) => o.id);
   const allChecked = allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
   const someChecked = allPageIds.some((id) => selectedIds.has(id));
@@ -263,7 +265,11 @@ export default function AssignOrders() {
                       />
                     </TableHead>
                     <TableHead>Order Code</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        Date <ArrowDownNarrowWide className="h-3.5 w-3.5 text-muted-foreground" />
+                      </span>
+                    </TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Vendor</TableHead>

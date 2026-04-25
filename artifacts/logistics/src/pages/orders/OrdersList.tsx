@@ -47,6 +47,24 @@ function getDateRange(preset: DatePreset, customFrom: string, customTo: string) 
   return { dateFrom: undefined, dateTo: undefined };
 }
 
+const ALL_ORDER_STATUSES: { value: string; label: string }[] = [
+  { value: "new", label: "New" },
+  { value: "under_review", label: "Under Review" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "assigned", label: "Assigned" },
+  { value: "picked_for_delivery", label: "Picked for Delivery" },
+  { value: "out_for_delivery", label: "Out for Delivery" },
+  { value: "delivered", label: "Delivered" },
+  { value: "partial_delivered", label: "Partial Delivered" },
+  { value: "failed_delivery", label: "Failed Delivery" },
+  { value: "reschedule", label: "Follow Up / Reschedule" },
+  { value: "return_pending", label: "Return Pending" },
+  { value: "returned", label: "Returned" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "payment_pending", label: "Payment Pending" },
+  { value: "payment_released", label: "Payment Released" },
+];
+
 const RIDER_NEXT_STATUSES: Record<string, { value: string; label: string }[]> = {
   assigned: [
     { value: "delivered", label: "Delivered" },
@@ -117,6 +135,10 @@ export default function OrdersList() {
   // Quick reassign
   const [reassignTarget, setReassignTarget] = useState<{ id: number; code: string; riderName?: string | null } | null>(null);
   const [reassignRiderId, setReassignRiderId] = useState<string>("");
+  const [reassignSearch, setReassignSearch] = useState("");
+
+  // Quick status change (admin/manager)
+  const [statusChangeTarget, setStatusChangeTarget] = useState<{ id: number; code: string; currentStatus: string } | null>(null);
   const { data: allRiders } = useListRiders({ status: "active" });
   const assignMutation = useAssignOrder({
     mutation: {
@@ -451,13 +473,10 @@ export default function OrdersList() {
                                 </DropdownMenu>
                               );
                             })()
-                          ) : canEdit && order.status === "assigned" ? (
+                          ) : canEdit ? (
                             <span
-                              title="Double-click to reassign rider"
-                              onDoubleClick={() => {
-                                setReassignTarget({ id: order.id, code: order.orderCode, riderName: order.riderName });
-                                setReassignRiderId("");
-                              }}
+                              title="Double-click to change status"
+                              onDoubleClick={() => setStatusChangeTarget({ id: order.id, code: order.orderCode, currentStatus: order.status })}
                               className="cursor-pointer select-none"
                             >
                               <StatusBadge status={order.status} className="ring-1 ring-offset-1 ring-primary/30 hover:ring-primary/60 transition-shadow" />
@@ -468,9 +487,21 @@ export default function OrdersList() {
                         </TableCell>
                         {!isVendor && (
                           <TableCell className="text-sm">
-                            {order.riderName
-                              ? <span className="font-medium">{order.riderName}</span>
-                              : <span className="text-muted-foreground">—</span>}
+                            {canEdit ? (
+                              <span
+                                title="Double-click to reassign rider"
+                                onDoubleClick={() => { setReassignTarget({ id: order.id, code: order.orderCode, riderName: order.riderName }); setReassignRiderId(""); setReassignSearch(""); }}
+                                className="cursor-pointer select-none"
+                              >
+                                {order.riderName
+                                  ? <span className="font-medium underline decoration-dotted underline-offset-2">{order.riderName}</span>
+                                  : <span className="text-muted-foreground italic text-xs">— double-click to assign</span>}
+                              </span>
+                            ) : (
+                              order.riderName
+                                ? <span className="font-medium">{order.riderName}</span>
+                                : <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                         )}
                         <TableCell className="text-right">
@@ -587,9 +618,46 @@ export default function OrdersList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Quick Reassign Dialog */}
-      <Dialog open={!!reassignTarget} onOpenChange={(open) => { if (!open) { setReassignTarget(null); setReassignRiderId(""); } }}>
+      {/* Quick Status Change Dialog (admin/manager) */}
+      <Dialog open={!!statusChangeTarget} onOpenChange={(open) => { if (!open) setStatusChangeTarget(null); }}>
         <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowDownNarrowWide className="h-5 w-5 text-primary" />
+              Change Order Status
+            </DialogTitle>
+            <DialogDescription>
+              Order <strong>{statusChangeTarget?.code}</strong> — current: <strong>{statusChangeTarget?.currentStatus.replace(/_/g, " ")}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 flex flex-wrap gap-2">
+            {ALL_ORDER_STATUSES.filter(s => s.value !== statusChangeTarget?.currentStatus).map(s => (
+              <button
+                key={s.value}
+                type="button"
+                disabled={statusChangeMutation.isPending}
+                onClick={() => {
+                  if (!statusChangeTarget) return;
+                  statusChangeMutation.mutate(
+                    { id: statusChangeTarget.id, data: { status: s.value } },
+                    { onSuccess: () => setStatusChangeTarget(null) }
+                  );
+                }}
+                className="px-3 py-1.5 rounded-full border text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground hover:border-primary disabled:opacity-50"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setStatusChangeTarget(null)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Reassign Dialog */}
+      <Dialog open={!!reassignTarget} onOpenChange={(open) => { if (!open) { setReassignTarget(null); setReassignRiderId(""); setReassignSearch(""); } }}>
+        <DialogContent className="sm:max-w-[360px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-primary" />
@@ -598,31 +666,51 @@ export default function OrdersList() {
             <DialogDescription>
               Order <strong>{reassignTarget?.code}</strong>
               {reassignTarget?.riderName && (
-                <> — currently assigned to <strong>{reassignTarget.riderName}</strong></>
+                <> — currently <strong>{reassignTarget.riderName}</strong></>
               )}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Select value={reassignRiderId} onValueChange={setReassignRiderId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a rider..." />
-              </SelectTrigger>
-              <SelectContent>
-                {!allRiders?.length ? (
-                  <SelectItem value="none" disabled>No active riders</SelectItem>
-                ) : (
-                  allRiders.map((r) => (
-                    <SelectItem key={r.id} value={String(r.id)}>
-                      {r.name}
-                      {r.stationName && <span className="text-muted-foreground ml-1">({r.stationName})</span>}
-                    </SelectItem>
-                  ))
+          <div className="py-2">
+            <div className="rounded-md border overflow-hidden">
+              <div className="relative border-b">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  autoFocus
+                  placeholder="Search rider…"
+                  value={reassignSearch}
+                  onChange={e => setReassignSearch(e.target.value)}
+                  className="w-full pl-8 pr-7 py-2 text-sm bg-background outline-none placeholder:text-muted-foreground"
+                  autoComplete="off"
+                />
+                {reassignSearch && (
+                  <button onClick={() => setReassignSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 )}
-              </SelectContent>
-            </Select>
+              </div>
+              <div className="max-h-52 overflow-y-auto">
+                {!allRiders?.length ? (
+                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">No active riders</div>
+                ) : (
+                  allRiders
+                    .filter(r => !reassignSearch || r.name.toLowerCase().includes(reassignSearch.toLowerCase()) || (r.stationName ?? "").toLowerCase().includes(reassignSearch.toLowerCase()))
+                    .map(r => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setReassignRiderId(String(r.id))}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-accent ${reassignRiderId === String(r.id) ? "bg-primary/10 text-primary font-semibold" : ""}`}
+                      >
+                        <span className="font-medium">{r.name}</span>
+                        {r.stationName && <span className="text-muted-foreground text-xs ml-auto shrink-0">· {r.stationName}</span>}
+                      </button>
+                    ))
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setReassignTarget(null); setReassignRiderId(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setReassignTarget(null); setReassignRiderId(""); setReassignSearch(""); }}>Cancel</Button>
             <Button
               disabled={!reassignRiderId || assignMutation.isPending}
               onClick={() => {
@@ -631,7 +719,7 @@ export default function OrdersList() {
               }}
             >
               {assignMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
-              Reassign
+              Confirm
             </Button>
           </DialogFooter>
         </DialogContent>

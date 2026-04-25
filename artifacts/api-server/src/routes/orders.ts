@@ -7,11 +7,14 @@ import { createNotification } from "../lib/notifications";
 
 const router: IRouter = Router();
 
-function generateOrderCode(): string {
-  const prefix = "SS";
-  const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${prefix}-${ts}-${rand}`;
+function tempOrderCode(): string {
+  return `_TEMP_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+async function setOrderCode(id: number): Promise<string> {
+  const code = `SN-${id}`;
+  await db.update(ordersTable).set({ orderCode: code }).where(eq(ordersTable.id, id));
+  return code;
 }
 
 async function checkDuplicate(order: { customerPhone: string; customerName: string; productName: string; address: string; vendorId: number }, excludeId?: number) {
@@ -205,7 +208,7 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
   const duplicate = await checkDuplicate({ customerPhone, customerName, productName, address, vendorId });
 
   const [order] = await db.insert(ordersTable).values({
-    orderCode: generateOrderCode(),
+    orderCode: tempOrderCode(),
     vendorId,
     customerName,
     customerPhone,
@@ -232,6 +235,7 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
     notes: notes ?? null,
     createdBy: userId,
   }).returning();
+  order.orderCode = await setOrderCode(order.id);
 
   // Status history
   await db.insert(orderStatusHistoryTable).values({
@@ -298,7 +302,7 @@ router.post("/orders/bulk", requireAuth, async (req, res): Promise<void> => {
       const duplicate = await checkDuplicate({ customerPhone: phoneClean, customerName: o.customerName, productName: o.productName, address: o.address, vendorId });
 
       const [order] = await db.insert(ordersTable).values({
-        orderCode: generateOrderCode(),
+        orderCode: tempOrderCode(),
         vendorId,
         customerName: o.customerName,
         customerPhone: phoneClean,
@@ -322,6 +326,7 @@ router.post("/orders/bulk", requireAuth, async (req, res): Promise<void> => {
         createdBy: userId,
       }).returning();
 
+      order.orderCode = await setOrderCode(order.id);
       await db.insert(orderStatusHistoryTable).values({ orderId: order.id, status: order.status, changedBy: userId });
       results.push(await formatOrder(order));
       created++;

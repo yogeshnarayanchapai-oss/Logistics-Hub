@@ -93,7 +93,7 @@ export default function Settings() {
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("authToken");
     fetch(`${base}/api/settings/general`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => {
@@ -112,7 +112,7 @@ export default function Settings() {
     setGeneralSaving(true);
     try {
       const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("authToken");
       const res = await fetch(`${base}/api/settings/general`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -166,7 +166,7 @@ export default function Settings() {
     setBrandingSaving(true);
     try {
       const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("authToken");
       const res = await fetch(`${base}/api/settings/branding`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

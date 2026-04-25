@@ -125,6 +125,7 @@ export default function Riders() {
       stationId: formData.get("stationId") ? Number(formData.get("stationId")) : null,
       status: formData.get("status") as string || "active",
       coverageArea: (formData.get("coverageArea") as string)?.trim() || null,
+      commissionRate: Number(formData.get("commissionRate") ?? 0),
     };
     if (!editingRider) {
       data.password = formData.get("password") as string;

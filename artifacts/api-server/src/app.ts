@@ -41,7 +41,7 @@ const staticDir = path.resolve(__dirname, "../../../artifacts/logistics/dist/pub
 logger.info({ staticDir, exists: existsSync(staticDir), NODE_ENV: process.env.NODE_ENV }, "Static files check");
 if (existsSync(staticDir)) {
   app.use(express.static(staticDir));
-  app.get("*", (_req, res) => {
+  app.get("/{*splat}", (_req, res) => {
     res.sendFile(path.join(staticDir, "index.html"));
   });
 } else {

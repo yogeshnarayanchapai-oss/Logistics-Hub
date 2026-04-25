@@ -423,20 +423,28 @@ router.get("/dashboard/cod-summary", requireAuth, async (req, res): Promise<void
   const userRole = (req as any).userRole as string;
   const { vendorId } = req.query as Record<string, string>;
 
-  const conditions: any[] = [eq(ordersTable.status, "delivered")];
+  const orderConditions: any[] = [eq(ordersTable.status, "delivered")];
+  const prConditions: any[] = [eq(paymentRequestsTable.status, "released")];
+
   if (userRole === "vendor") {
     const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
-    if (vendor) conditions.push(eq(ordersTable.vendorId, vendor.id));
-    else { res.json({ totalCodCollected: 0, totalDeliveryCharge: 0, totalVendorPayable: 0, totalReleased: 0, pendingRelease: 0 }); return; }
+    if (!vendor) {
+      res.json({ totalCodCollected: 0, totalDeliveryCharge: 0, totalVendorPayable: 0, totalReleased: 0, pendingRelease: 0 });
+      return;
+    }
+    orderConditions.push(eq(ordersTable.vendorId, vendor.id));
+    prConditions.push(eq(paymentRequestsTable.vendorId, vendor.id));
   } else if (vendorId) {
-    conditions.push(eq(ordersTable.vendorId, parseInt(vendorId, 10)));
+    const vid = parseInt(vendorId, 10);
+    orderConditions.push(eq(ordersTable.vendorId, vid));
+    prConditions.push(eq(paymentRequestsTable.vendorId, vid));
   }
 
-  const [cod] = await db.select({ total: sum(ordersTable.codAmount) }).from(ordersTable).where(and(...conditions));
-  const [dc] = await db.select({ total: sum(ordersTable.deliveryCharge) }).from(ordersTable).where(and(...conditions));
-  const [vp] = await db.select({ total: sum(ordersTable.vendorPayable) }).from(ordersTable).where(and(...conditions));
-  const [released] = await db.select({ total: sum(paymentRequestsTable.approvedAmount) }).from(paymentRequestsTable).where(eq(paymentRequestsTable.status, "released"));
-  const [pending] = await db.select({ total: sum(ordersTable.vendorPayable) }).from(ordersTable).where(and(...conditions, eq(ordersTable.paymentReleaseStatus, "pending")));
+  const [cod] = await db.select({ total: sum(ordersTable.codAmount) }).from(ordersTable).where(and(...orderConditions));
+  const [dc] = await db.select({ total: sum(ordersTable.deliveryCharge) }).from(ordersTable).where(and(...orderConditions));
+  const [vp] = await db.select({ total: sum(ordersTable.vendorPayable) }).from(ordersTable).where(and(...orderConditions));
+  const [released] = await db.select({ total: sum(paymentRequestsTable.approvedAmount) }).from(paymentRequestsTable).where(and(...prConditions));
+  const [pending] = await db.select({ total: sum(ordersTable.vendorPayable) }).from(ordersTable).where(and(...orderConditions, eq(ordersTable.paymentReleaseStatus, "pending")));
 
   res.json({
     totalCodCollected: Number(cod.total ?? 0),

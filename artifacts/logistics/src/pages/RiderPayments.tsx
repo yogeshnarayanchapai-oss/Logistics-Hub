@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Wallet, TrendingUp, CreditCard, Plus, Trash2, Send, CheckCircle, Clock, XCircle, DollarSign } from "lucide-react";
+import { Loader2, Wallet, TrendingUp, CreditCard, Plus, Trash2, Send, CheckCircle, Clock, XCircle, Download, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -31,7 +31,6 @@ export default function RiderPayments() {
   const token = () => localStorage.getItem("authToken");
 
   const [summary, setSummary] = useState({ totalEarned: 0, totalReleased: 0, pendingBalance: 0, totalOrders: 0 });
-  const [commissions, setCommissions] = useState<any[]>([]);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +53,6 @@ export default function RiderPayments() {
       const commData = await commRes.json();
       const bankData = await bankRes.json();
       const payData = await payRes.json();
-      setCommissions(Array.isArray(commData.entries) ? commData.entries : []);
       setSummary(commData.summary ?? { totalEarned: 0, totalReleased: 0, pendingBalance: 0, totalOrders: 0 });
       setBankAccounts(Array.isArray(bankData) ? bankData : []);
       setPaymentRequests(Array.isArray(payData) ? payData : []);
@@ -121,7 +119,59 @@ export default function RiderPayments() {
     } finally { setSubmitting(false); }
   };
 
+  const downloadRiderPdf = (request: any) => {
+    const commissions: any[] = request.commissions ?? [];
+    const total = commissions.reduce((s: number, c: any) => s + Number(c.amount), 0);
+
+    const rows = commissions.map((c: any, i: number) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${c.orderCode}</td>
+        <td>${c.customerName ?? "—"}</td>
+        <td>${c.productName ?? "—"}</td>
+        <td class="num">Rs. ${Number(c.amount).toLocaleString()}</td>
+      </tr>`).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+      <title>Commission Statement - ${user?.name ?? "Rider"}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #111; }
+        h2 { margin: 0 0 4px; } p { margin: 2px 0; color: #555; }
+        .header { margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f3f4f6; text-align: left; padding: 6px 8px; border: 1px solid #d1d5db; font-size: 11px; }
+        td { padding: 5px 8px; border: 1px solid #e5e7eb; vertical-align: top; }
+        .num { text-align: right; }
+        tfoot td { font-weight: bold; background: #f9fafb; }
+        .meta { display: flex; gap: 40px; margin-top: 12px; font-size: 11px; color: #6b7280; }
+      </style></head><body>
+      <div class="header">
+        <h2>Commission Payment Statement</h2>
+        <p>Rider: <strong>${request.riderName}</strong></p>
+        <p>Request Date: ${new Date(request.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+        ${request.referenceId ? `<p>Transfer Ref: <strong>${request.referenceId}</strong></p>` : ""}
+        ${request.paymentDate ? `<p>Payment Date: ${request.paymentDate}</p>` : ""}
+        ${request.approvedAmount ? `<p>Amount Paid: <strong>Rs. ${Number(request.approvedAmount).toLocaleString()}</strong></p>` : ""}
+        <p>Bank: ${request.bankName} &nbsp;|&nbsp; Account: ${request.accountNumber}</p>
+      </div>
+      <table>
+        <thead><tr><th>SN</th><th>Order #</th><th>Customer</th><th>Product</th><th class="num">Commission</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td colspan="4">Total (${commissions.length} orders)</td>
+          <td class="num">Rs. ${total.toLocaleString()}</td>
+        </tr></tfoot>
+      </table>
+      <script>window.onload=()=>{window.print();}</script>
+      </body></html>`;
+
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
+  };
+
   const fmtAmt = (n: number) => `Rs. ${n.toLocaleString("en-NP")}`;
+
+  const releasedRequests = paymentRequests.filter(r => r.status === "released");
 
   return (
     <div className="space-y-6">
@@ -177,40 +227,66 @@ export default function RiderPayments() {
         </Card>
       </div>
 
-      <Tabs defaultValue="requests">
+      <Tabs defaultValue="received">
         <TabsList>
-          <TabsTrigger value="requests">Payment Requests</TabsTrigger>
-          <TabsTrigger value="banks">Bank Accounts</TabsTrigger>
-          <TabsTrigger value="commissions">Commission Log</TabsTrigger>
+          <TabsTrigger value="received"><CheckCircle className="mr-1.5 h-4 w-4" /> Received Payments</TabsTrigger>
+          <TabsTrigger value="requests"><Send className="mr-1.5 h-4 w-4" /> Payment Requests</TabsTrigger>
+          <TabsTrigger value="banks"><CreditCard className="mr-1.5 h-4 w-4" /> Bank Accounts</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="commissions">
+        {/* ── Received / Released Payments ── */}
+        <TabsContent value="received">
           <Card>
             <CardContent className="p-0">
               {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-              ) : commissions.length === 0 ? (
+              ) : releasedRequests.length === 0 ? (
                 <div className="flex flex-col items-center py-16 text-muted-foreground">
-                  <DollarSign className="h-12 w-12 mb-3 opacity-20" />
-                  <p className="font-medium">No commissions yet</p>
-                  <p className="text-sm mt-1">Commissions are added automatically after each successful delivery.</p>
+                  <FileText className="h-12 w-12 mb-3 opacity-20" />
+                  <p className="font-medium">No payments received yet</p>
+                  <p className="text-sm mt-1">Payments released by admin will appear here with full breakdown.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Order</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Date</TableHead>
+                        <TableHead className="w-12">S.No</TableHead>
+                        <TableHead>Transfer ID / Ref</TableHead>
+                        <TableHead>Payment Date</TableHead>
+                        <TableHead className="text-right">Amount (Rs.)</TableHead>
+                        <TableHead>Bank</TableHead>
+                        <TableHead className="text-center">Orders</TableHead>
+                        <TableHead className="text-center">PDF</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {commissions.map(c => (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium">{c.orderCode || `#${c.orderId}`}</TableCell>
-                          <TableCell className="text-right font-bold text-green-700">{fmtAmt(c.amount)}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{format(new Date(c.createdAt), "dd MMM yyyy HH:mm")}</TableCell>
+                      {releasedRequests.map((r, idx) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
+                          <TableCell>
+                            <div className="font-mono font-semibold">{r.referenceId || "—"}</div>
+                            {r.releaseNote && <div className="text-xs text-muted-foreground mt-0.5">{r.releaseNote}</div>}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {r.paymentDate ? r.paymentDate : format(new Date(r.createdAt), "dd MMM yyyy")}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-emerald-700 text-base">
+                            Rs. {(r.approvedAmount ?? r.requestedAmount).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div>{r.bankName}</div>
+                            <div className="text-xs text-muted-foreground">{r.accountNumber}</div>
+                          </TableCell>
+                          <TableCell className="text-center text-sm text-muted-foreground">
+                            {r.commissions?.length ?? 0}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 h-8 w-8 p-0"
+                              onClick={() => downloadRiderPdf(r)} title="Download PDF">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -221,10 +297,13 @@ export default function RiderPayments() {
           </Card>
         </TabsContent>
 
+        {/* ── Payment Requests ── */}
         <TabsContent value="requests">
           <Card>
             <CardContent className="p-0">
-              {paymentRequests.length === 0 ? (
+              {loading ? (
+                <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : paymentRequests.length === 0 ? (
                 <div className="flex flex-col items-center py-16 text-muted-foreground">
                   <Send className="h-12 w-12 mb-3 opacity-20" />
                   <p className="font-medium">No payment requests yet</p>
@@ -264,8 +343,8 @@ export default function RiderPayments() {
                             <TableCell className="text-muted-foreground text-xs">{r.referenceId || "—"}</TableCell>
                             <TableCell className="text-muted-foreground text-sm">{format(new Date(r.createdAt), "dd MMM yyyy")}</TableCell>
                             <TableCell className="max-w-[160px]">
-                              {(r as any).adminNote
-                                ? <span className="text-xs text-blue-700 line-clamp-2">{(r as any).adminNote}</span>
+                              {r.adminNote
+                                ? <span className="text-xs text-blue-700 line-clamp-2">{r.adminNote}</span>
                                 : <span className="text-xs text-muted-foreground">—</span>}
                             </TableCell>
                           </TableRow>
@@ -279,6 +358,7 @@ export default function RiderPayments() {
           </Card>
         </TabsContent>
 
+        {/* ── Bank Accounts ── */}
         <TabsContent value="banks">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between py-4">

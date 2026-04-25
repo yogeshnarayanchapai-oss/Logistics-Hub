@@ -208,6 +208,15 @@ export default function Payments() {
       .finally(() => setViewOrdersLoading(false));
   };
 
+  const handleDownloadCodPdf = async (payment: any) => {
+    const res = await fetch(`${BASE}/api/payment-requests/${payment.id}/orders`, {
+      headers: { Authorization: `Bearer ${authToken()}` }
+    });
+    if (!res.ok) return;
+    const orders = await res.json();
+    downloadPaymentPdf(payment, Array.isArray(orders) ? orders : []);
+  };
+
   const downloadPaymentPdf = (payment: any, orders: any[]) => {
     const totalCod = orders.reduce((s: number, o: any) => s + Number(o.codAmount), 0);
     const totalDelivery = orders.reduce((s: number, o: any) => s + Number(o.deliveryCharge), 0);
@@ -507,64 +516,188 @@ export default function Payments() {
 
         {/* ── Vendor Payment Requests ── */}
         <TabsContent value="vendor" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Requests</CardTitle>
-              <CardDescription>History of all payment requests and their status.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        {!isVendor && <TableHead>Vendor</TableHead>}
-                        <TableHead>Account Info</TableHead>
-                        <TableHead className="text-right">Requested</TableHead>
-                        <TableHead className="text-right">Approved</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Remarks</TableHead>
-                        {!isVendor && <TableHead className="text-right">Actions</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {payments?.length === 0 ? (
+          {isVendor ? (
+            <Tabs defaultValue="cod">
+              <TabsList>
+                <TabsTrigger value="cod">COD Payment</TabsTrigger>
+                <TabsTrigger value="requests">Payment Request</TabsTrigger>
+              </TabsList>
+
+              {/* Tab 1: Released / completed COD payments */}
+              <TabsContent value="cod" className="mt-4">
+                <Card>
+                  <CardContent className="p-0">
+                    {isLoading ? (
+                      <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                    ) : (() => {
+                      const released = (payments ?? []).filter(p => p.status === "released");
+                      if (released.length === 0) return (
+                        <div className="flex flex-col items-center py-16 text-muted-foreground">
+                          <DollarSign className="h-12 w-12 mb-3 opacity-20" />
+                          <p className="font-medium">No payments received yet</p>
+                          <p className="text-sm mt-1">Completed COD payments will appear here once released by admin.</p>
+                        </div>
+                      );
+                      return (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-12">S.No</TableHead>
+                                <TableHead>Transfer ID</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Amount (Rs.)</TableHead>
+                                <TableHead>Bank / Collection</TableHead>
+                                <TableHead className="text-center">Print</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {released.map((payment, idx) => (
+                                <TableRow key={payment.id}>
+                                  <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
+                                  <TableCell>
+                                    <div className="font-mono font-semibold">{payment.referenceId || "—"}</div>
+                                    {payment.paymentDate && <div className="text-xs text-muted-foreground">{payment.paymentDate}</div>}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">{format(new Date(payment.createdAt), "dd MMM yyyy")}</TableCell>
+                                  <TableCell className="text-right font-bold text-emerald-700 text-base">
+                                    Rs. {(payment.approvedAmount ?? payment.requestedAmount).toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-sm">{(payment as any).walletMethod || ((payment as any).bankName ?? "Transfer")}</TableCell>
+                                  <TableCell className="text-center">
+                                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 h-8 w-8 p-0"
+                                      onClick={() => handleDownloadCodPdf(payment)} title="Download PDF">
+                                      <Download className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Tab 2: All payment requests */}
+              <TabsContent value="requests" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>My Payment Requests</CardTitle>
+                    <CardDescription>Track the status of your submitted payment requests.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                    ) : (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Account Info</TableHead>
+                              <TableHead className="text-right">Requested</TableHead>
+                              <TableHead className="text-right">Approved</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Remarks</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {!payments?.length ? (
+                              <TableRow>
+                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
+                              </TableRow>
+                            ) : (
+                              payments.map((payment) => (
+                                <TableRow key={payment.id}>
+                                  <TableCell className="font-medium">{format(new Date(payment.createdAt), "MMM d, yyyy")}</TableCell>
+                                  <TableCell>
+                                    <div className="text-sm max-w-[200px] truncate">{payment.bankAccountInfo}</div>
+                                    {payment.referenceId && <div className="text-xs text-muted-foreground">Ref: {payment.referenceId}</div>}
+                                  </TableCell>
+                                  <TableCell className="text-right">Rs. {payment.requestedAmount.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{payment.approvedAmount ? `Rs. ${payment.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={
+                                      payment.status === "pending" ? "secondary" :
+                                      payment.status === "approved" ? "default" :
+                                      payment.status === "released" ? "outline" : "destructive"
+                                    } className={payment.status === "released" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : ""}>
+                                      {payment.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="max-w-[160px]">
+                                    {(payment as any).adminNote
+                                      ? <span className="text-xs text-blue-700 line-clamp-2">{(payment as any).adminNote}</span>
+                                      : <span className="text-xs text-muted-foreground">—</span>}
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Vendor Payment Requests</CardTitle>
+                <CardDescription>History of all vendor payment requests and their status.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={isVendor ? 6 : 8} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Vendor</TableHead>
+                          <TableHead>Account Info</TableHead>
+                          <TableHead className="text-right">Requested</TableHead>
+                          <TableHead className="text-right">Approved</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Remarks</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ) : (
-                        payments?.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell className="font-medium">
-                              {format(new Date(payment.createdAt), "MMM d, yyyy")}
-                            </TableCell>
-                            {!isVendor && <TableCell>{payment.vendorName}</TableCell>}
-                            <TableCell>
-                              <div className="text-sm max-w-[200px] truncate">{payment.bankAccountInfo}</div>
-                              {payment.referenceId && <div className="text-xs text-muted-foreground">Ref: {payment.referenceId}</div>}
-                            </TableCell>
-                            <TableCell className="text-right">Rs. {payment.requestedAmount.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">
-                              {payment.approvedAmount ? `Rs. ${payment.approvedAmount.toLocaleString()}` : "-"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={
-                                payment.status === 'pending' ? 'secondary' :
-                                payment.status === 'approved' ? 'default' :
-                                payment.status === 'released' ? 'outline' : 'destructive'
-                              } className={payment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
-                                {payment.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="max-w-[160px]">
-                              {(payment as any).adminNote
-                                ? <span className="text-xs text-blue-700 line-clamp-2">{(payment as any).adminNote}</span>
-                                : <span className="text-xs text-muted-foreground">—</span>}
-                            </TableCell>
-                            {!isVendor && (
+                      </TableHeader>
+                      <TableBody>
+                        {payments?.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No payment requests found.</TableCell>
+                          </TableRow>
+                        ) : (
+                          payments?.map((payment) => (
+                            <TableRow key={payment.id}>
+                              <TableCell className="font-medium">{format(new Date(payment.createdAt), "MMM d, yyyy")}</TableCell>
+                              <TableCell>{payment.vendorName}</TableCell>
+                              <TableCell>
+                                <div className="text-sm max-w-[200px] truncate">{payment.bankAccountInfo}</div>
+                                {payment.referenceId && <div className="text-xs text-muted-foreground">Ref: {payment.referenceId}</div>}
+                              </TableCell>
+                              <TableCell className="text-right">Rs. {payment.requestedAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{payment.approvedAmount ? `Rs. ${payment.approvedAmount.toLocaleString()}` : "—"}</TableCell>
+                              <TableCell>
+                                <Badge variant={
+                                  payment.status === 'pending' ? 'secondary' :
+                                  payment.status === 'approved' ? 'default' :
+                                  payment.status === 'released' ? 'outline' : 'destructive'
+                                } className={payment.status === 'released' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>
+                                  {payment.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="max-w-[160px]">
+                                {(payment as any).adminNote
+                                  ? <span className="text-xs text-blue-700 line-clamp-2">{(payment as any).adminNote}</span>
+                                  : <span className="text-xs text-muted-foreground">—</span>}
+                              </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openViewDialog(payment)}>
@@ -581,16 +714,16 @@ export default function Payments() {
                                   )}
                                 </div>
                               </TableCell>
-                            )}
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ── Rider Commission Payments ── */}

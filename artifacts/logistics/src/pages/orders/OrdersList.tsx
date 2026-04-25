@@ -138,6 +138,7 @@ export default function OrdersList() {
   );
 
   const isRider = user?.role === "rider";
+  const isVendor = user?.role === "vendor";
 
   const queryParams = {
     search: activeSearch || undefined,
@@ -369,7 +370,7 @@ export default function OrdersList() {
                     <TableHead>Location</TableHead>
                     <TableHead>COD Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Rider</TableHead>
+                    {!isVendor && <TableHead>Rider</TableHead>}
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -459,11 +460,13 @@ export default function OrdersList() {
                             <StatusBadge status={order.status} />
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {order.riderName
-                            ? <span className="font-medium">{order.riderName}</span>
-                            : <span className="text-muted-foreground">—</span>}
-                        </TableCell>
+                        {!isVendor && (
+                          <TableCell className="text-sm">
+                            {order.riderName
+                              ? <span className="font-medium">{order.riderName}</span>
+                              : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {isRider ? (

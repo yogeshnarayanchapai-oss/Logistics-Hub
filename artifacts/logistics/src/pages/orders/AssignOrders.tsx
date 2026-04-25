@@ -100,70 +100,75 @@ function AssignButton({
               <span className="truncate">{orderLocation}</span>
             </div>
           )}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Search rider..."
-              value={riderSearch}
-              onChange={e => setRiderSearch(e.target.value)}
-              className="pl-8 h-8 text-sm"
-              autoComplete="off"
-            />
-            {riderSearch && (
-              <button
-                onClick={() => setRiderSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-          <Select value={selectedRider} onValueChange={setSelectedRider}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a rider..." />
-            </SelectTrigger>
-            <SelectContent>
+          {/* Integrated search + rider list */}
+          <div className="rounded-md border overflow-hidden">
+            <div className="relative border-b">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                autoFocus
+                placeholder="Search rider…"
+                value={riderSearch}
+                onChange={e => setRiderSearch(e.target.value)}
+                className="w-full pl-8 pr-7 py-2 text-sm bg-background outline-none placeholder:text-muted-foreground"
+                autoComplete="off"
+              />
+              {riderSearch && (
+                <button
+                  onClick={() => setRiderSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="max-h-52 overflow-y-auto">
               {!sortedRiders.length ? (
-                <SelectItem value="none" disabled>No riders available</SelectItem>
+                <div className="px-3 py-4 text-center text-xs text-muted-foreground">No riders found</div>
               ) : (
                 <>
                   {(suggested ?? []).length > 0 && (
                     <>
-                      <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-600 flex items-center gap-1">
+                      <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-600 flex items-center gap-1 bg-amber-50/60">
                         <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" /> Suggested
                       </div>
                       {(suggested ?? []).map(r => (
-                        <SelectItem key={r.id} value={String(r.id)}>
-                          <div className="flex items-center gap-1.5">
-                            <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
-                            <span className="font-medium">{r.name}</span>
-                            {r.stationName && <span className="text-muted-foreground text-xs">· {r.stationName}</span>}
-                          </div>
-                        </SelectItem>
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setSelectedRider(String(r.id))}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-accent ${selectedRider === String(r.id) ? "bg-primary/10 text-primary font-semibold" : ""}`}
+                        >
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
+                          <span className="font-medium">{r.name}</span>
+                          {r.stationName && <span className="text-muted-foreground text-xs ml-auto shrink-0">· {r.stationName}</span>}
+                        </button>
                       ))}
                     </>
                   )}
                   {(rest ?? []).length > 0 && (
                     <>
                       {(suggested ?? []).length > 0 && (
-                        <div className="px-2 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1 border-t mt-1">
+                        <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/40 border-t">
                           Other Riders
                         </div>
                       )}
                       {(rest ?? []).map(r => (
-                        <SelectItem key={r.id} value={String(r.id)}>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium">{r.name}</span>
-                            {r.stationName && <span className="text-muted-foreground text-xs">· {r.stationName}</span>}
-                          </div>
-                        </SelectItem>
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setSelectedRider(String(r.id))}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-accent ${selectedRider === String(r.id) ? "bg-primary/10 text-primary font-semibold" : ""}`}
+                        >
+                          <span className="font-medium">{r.name}</span>
+                          {r.stationName && <span className="text-muted-foreground text-xs ml-auto shrink-0">· {r.stationName}</span>}
+                        </button>
                       ))}
                     </>
                   )}
                 </>
               )}
-            </SelectContent>
-          </Select>
+            </div>
+          </div>
           <div className="flex gap-2">
             <Button size="sm" className="flex-1"
               onClick={() => {

@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import path from "path";
 import { existsSync } from "fs";
+import { fileURLToPath } from "url";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -35,12 +36,17 @@ app.use("/api", router);
 
 // In production, serve the built frontend and handle SPA routing
 if (process.env.NODE_ENV === "production") {
-  const staticDir = path.join(process.cwd(), "artifacts/logistics/dist/public");
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  // Compiled file is at artifacts/api-server/dist/app.js — go up 3 levels to workspace root
+  const staticDir = path.resolve(__dirname, "../../../artifacts/logistics/dist/public");
+  logger.info({ staticDir, exists: existsSync(staticDir) }, "Static files check");
   if (existsSync(staticDir)) {
     app.use(express.static(staticDir));
     app.get("*", (_req, res) => {
       res.sendFile(path.join(staticDir, "index.html"));
     });
+  } else {
+    logger.error({ staticDir }, "Frontend static files not found — frontend will not be served");
   }
 }
 

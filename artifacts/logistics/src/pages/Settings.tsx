@@ -1,11 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Plus, Pencil, Trash2, Phone, User2, Building2, Loader2, Palette, Upload, X } from "lucide-react";
+import { Save, Plus, Pencil, Trash2, Phone, User2, Building2, Loader2, Palette, Upload, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   useListSupportContacts, useCreateSupportContact, useUpdateSupportContact,
@@ -81,9 +81,47 @@ export default function Settings() {
     setIsDialogOpen(true);
   };
 
-  const handleSettingsSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({ title: "Settings saved successfully" });
+  // ── General settings state ──
+  const [rateMode, setRateMode] = useState<"default" | "custom">("default");
+  const [defaultDeliveryCharge, setDefaultDeliveryCharge] = useState(100);
+  const [generalLoading, setGeneralLoading] = useState(true);
+  const [generalSaving, setGeneralSaving] = useState(false);
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    const token = localStorage.getItem("auth_token");
+    fetch(`${base}/api/settings/general`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => {
+        setRateMode(d.rateMode ?? "default");
+        setDefaultDeliveryCharge(d.defaultDeliveryCharge ?? 100);
+      })
+      .catch(() => {})
+      .finally(() => setGeneralLoading(false));
+  }, []);
+
+  const saveGeneralSettings = async () => {
+    setGeneralSaving(true);
+    try {
+      const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`${base}/api/settings/general`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ rateMode, defaultDeliveryCharge }),
+      });
+      if (!res.ok) throw new Error();
+      toast({
+        title: "Settings saved",
+        description: rateMode === "default"
+          ? `All stations updated to Rs. ${defaultDeliveryCharge} delivery charge.`
+          : "Each station will use its own individually configured rate.",
+      });
+    } catch {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    } finally {
+      setGeneralSaving(false);
+    }
   };
 
   // ── Branding tab state ──
@@ -152,7 +190,7 @@ export default function Settings() {
 
         {/* ── General Tab ── */}
         <TabsContent value="general">
-          <form onSubmit={handleSettingsSave} className="space-y-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>General Configuration</CardTitle>
@@ -202,20 +240,86 @@ export default function Settings() {
                   </div>
                   <Switch defaultChecked />
                 </div>
-                <div className="space-y-2 pt-2">
-                  <Label htmlFor="defaultDeliveryCharge">Default Base Delivery Charge (Rs.)</Label>
-                  <Input id="defaultDeliveryCharge" type="number" defaultValue="100" className="max-w-xs" />
+
+                {/* ── Delivery Rate Mode ── */}
+                <div className="pt-2 space-y-3">
+                  <Label className="text-base">Delivery Charge Rate</Label>
+                  <p className="text-sm text-muted-foreground -mt-1">Choose how delivery charges are applied across service stations.</p>
+
+                  {generalLoading ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Default option */}
+                      <button
+                        type="button"
+                        onClick={() => setRateMode("default")}
+                        className={`relative flex flex-col gap-1.5 rounded-xl border-2 p-4 text-left transition-all ${
+                          rateMode === "default"
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        {rateMode === "default" && (
+                          <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                            <Check className="h-3 w-3 text-white" />
+                          </span>
+                        )}
+                        <span className="font-semibold text-sm">Default Rate</span>
+                        <span className="text-xs text-muted-foreground">
+                          One global rate applied to all service stations. Saving will update every station's charge.
+                        </span>
+                        {rateMode === "default" && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-sm font-medium text-muted-foreground shrink-0">Rs.</span>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={defaultDeliveryCharge}
+                              onChange={(e) => setDefaultDeliveryCharge(Number(e.target.value))}
+                              className="h-8 max-w-[120px] text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span className="text-xs text-muted-foreground">per delivery</span>
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Custom option */}
+                      <button
+                        type="button"
+                        onClick={() => setRateMode("custom")}
+                        className={`relative flex flex-col gap-1.5 rounded-xl border-2 p-4 text-left transition-all ${
+                          rateMode === "custom"
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        {rateMode === "custom" && (
+                          <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                            <Check className="h-3 w-3 text-white" />
+                          </span>
+                        )}
+                        <span className="font-semibold text-sm">Custom Rate</span>
+                        <span className="text-xs text-muted-foreground">
+                          Each service station uses its own individually configured delivery charge. Rates are set per station.
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <div className="flex justify-end">
-              <Button type="submit">
-                <Save className="mr-2 h-4 w-4" />
+              <Button onClick={saveGeneralSettings} disabled={generalSaving || generalLoading}>
+                {generalSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Save Settings
               </Button>
             </div>
-          </form>
+          </div>
         </TabsContent>
 
         {/* ── Branding Tab ── */}

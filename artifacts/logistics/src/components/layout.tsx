@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth, getRoleHome } from "@/lib/auth";
 import { useListNotifications } from "@workspace/api-client-react";
+import { useBranding } from "@/lib/branding";
 import {
   LayoutDashboard,
   Package,
@@ -106,6 +107,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
+  const { branding } = useBranding();
   const [location] = useLocation();
 
   const { data: unreadNotifications } = useListNotifications(
@@ -162,9 +164,13 @@ export function Layout({ children }: LayoutProps) {
       {/* Sidebar */}
       <div className="hidden md:flex w-64 flex-col fixed inset-y-0 bg-primary z-50 shadow-lg">
         <div className="flex h-16 shrink-0 items-center px-6 border-b border-primary-foreground/20">
-          <Truck className="h-8 w-8 text-primary-foreground mr-2" />
-          <span className="text-xl font-bold text-primary-foreground">
-            SwiftShip
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt="logo" className="h-8 w-8 mr-2 object-contain rounded" />
+          ) : (
+            <Truck className="h-8 w-8 text-primary-foreground mr-2" />
+          )}
+          <span className="text-xl font-bold text-primary-foreground truncate">
+            {branding.companyName}
           </span>
         </div>
 

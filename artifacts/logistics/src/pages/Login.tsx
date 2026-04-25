@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { useBranding } from "@/lib/branding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const { login: setAuthToken } = useAuth();
+  const { branding } = useBranding();
   const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
@@ -51,9 +53,13 @@ export default function Login() {
       <div className="max-w-md w-full space-y-8">
         <div className="flex flex-col items-center justify-center">
           <div className="bg-primary p-3 rounded-full mb-4">
-            <Truck className="h-10 w-10 text-white" />
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt="logo" className="h-10 w-10 object-contain" />
+            ) : (
+              <Truck className="h-10 w-10 text-white" />
+            )}
           </div>
-          <h2 className="text-3xl font-extrabold text-gray-900">SwiftShip</h2>
+          <h2 className="text-3xl font-extrabold text-gray-900">{branding.companyName}</h2>
           <p className="mt-2 text-sm text-gray-600">Logistics Management System</p>
         </div>
 

@@ -1,7 +1,7 @@
 import { useAuth } from "@/lib/auth";
 import { useListStock, useCreateStockEntry, useUpdateStockEntry, useDeleteStockEntry, useListVendors, useListRiders, getListStockQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +26,89 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
 type DialogMode = "add-product" | "stock-in" | "stock-out" | "assign-inventory" | "return-inventory" | null;
+
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = "— Search and select —",
+  disabled = false,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selected = options.find((o) => o.value === value);
+  const filtered = query
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  const handleSelect = (v: string) => {
+    onChange(v);
+    setQuery("");
+    setOpen(false);
+  };
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        className={`flex h-9 w-full items-center rounded-md border border-input bg-background text-sm shadow-sm cursor-text ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+        onClick={() => { setOpen(true); inputRef.current?.focus(); }}
+      >
+        {open ? (
+          <input
+            ref={inputRef}
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Type to search..."
+            className="flex-1 h-full px-3 bg-transparent outline-none placeholder:text-muted-foreground"
+          />
+        ) : (
+          <span className={`flex-1 px-3 truncate ${selected ? "" : "text-muted-foreground"}`}>
+            {selected ? selected.label : placeholder}
+          </span>
+        )}
+        <span className="pr-2 text-muted-foreground">▾</span>
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg max-h-48 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">No results found.</div>
+          ) : (
+            filtered.map((o) => (
+              <div
+                key={o.value}
+                onMouseDown={() => handleSelect(o.value)}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-muted transition-colors ${o.value === value ? "bg-primary/10 font-medium" : ""}`}
+              >
+                {o.label}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Stock() {
   const { user } = useAuth();
@@ -65,6 +148,12 @@ export default function Stock() {
 
   // Assign/Deassign combined dialog
   const [assignDialogTab, setAssignDialogTab] = useState<"assign" | "deassign">("assign");
+  // Assign form (controlled)
+  const [assignRiderId, setAssignRiderId] = useState<string>("");
+  const [assignStockId, setAssignStockId] = useState<string>("");
+  const [assignQty, setAssignQty] = useState<string>("");
+  const [assignNote, setAssignNote] = useState<string>("");
+  // Deassign form
   const [deassignRiderId, setDeassignRiderId] = useState<string>("");
   const [deassignEntryId, setDeassignEntryId] = useState<string>("");
   const [deassignQty, setDeassignQty] = useState<string>("");
@@ -123,14 +212,8 @@ export default function Stock() {
 
   useEffect(() => { fetchRiderInventories(); }, [fetchRiderInventories]);
 
-  const handleAssignInventory = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const riderId = fd.get("riderId") as string;
-    const stockId = fd.get("stockId") as string;
-    const qty = fd.get("qty") as string;
-    const note = fd.get("note") as string;
-    if (!riderId || !stockId || !qty || Number(qty) <= 0) {
+  const handleAssignInventory = async () => {
+    if (!assignRiderId || !assignStockId || !assignQty || Number(assignQty) <= 0) {
       toast({ title: "Fill all fields with a valid quantity", variant: "destructive" }); return;
     }
     setAssignPending(true);
@@ -138,12 +221,14 @@ export default function Stock() {
       const res = await fetch(`${BASE}/api/rider-inventory/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
-        body: JSON.stringify({ riderId, stockId, qty: Number(qty), note }),
+        body: JSON.stringify({ riderId: assignRiderId, stockId: assignStockId, qty: Number(assignQty), note: assignNote || undefined }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
       toast({ title: "Inventory assigned to rider" });
       setDialogMode(null);
+      setAssignRiderId(""); setAssignStockId(""); setAssignQty(""); setAssignNote("");
       fetchRiderInventories();
+      queryClient.invalidateQueries({ queryKey: getListStockQueryKey() });
     } catch (err: any) {
       toast({ title: err.message || "Assignment failed", variant: "destructive" });
     } finally { setAssignPending(false); }
@@ -781,106 +866,97 @@ export default function Stock() {
             </button>
           </div>
 
-          {assignDialogTab === "assign" ? (
-            <form onSubmit={handleAssignInventory}>
-              <div className="grid gap-4 py-3">
-                <div className="space-y-2">
-                  <Label htmlFor="riderId">Rider *</Label>
-                  <select name="riderId" id="riderId" required
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                    <option value="">— Select rider —</option>
-                    {(riders ?? []).map((r: any) => (
-                      <option key={r.id} value={r.id}>{r.name} ({r.phone})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stockId">Product *</Label>
-                  <select name="stockId" id="stockId" required
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                    <option value="">— Select product —</option>
-                    {(rawEntries ?? []).filter(e => e.currentStock > 0).map((e: any) => (
-                      <option key={e.id} value={e.id}>{e.productName} {e.productSku ? `(${e.productSku})` : ""} — {e.currentStock} in stock</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="qty">Quantity *</Label>
-                  <Input id="qty" name="qty" type="number" min="1" placeholder="e.g. 20" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="note">Note (optional)</Label>
-                  <Input id="note" name="note" placeholder="e.g. For Kathmandu route" />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
-                <Button type="submit" disabled={assignPending}>
-                  {assignPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Assign
-                </Button>
-              </DialogFooter>
-            </form>
-          ) : (
-            <div>
-              <div className="grid gap-4 py-3">
-                <div className="space-y-2">
-                  <Label>Rider *</Label>
-                  <select
-                    value={deassignRiderId}
-                    onChange={(e) => { setDeassignRiderId(e.target.value); setDeassignEntryId(""); setDeassignQty(""); }}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">— Select rider —</option>
-                    {Array.from(new Map(riderInventories.filter(e => e.currentQty > 0).map(e => [e.riderId, e])).values()).map((e: any) => (
-                      <option key={e.riderId} value={e.riderId}>{e.riderName}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Product *</Label>
-                  <select
-                    value={deassignEntryId}
-                    onChange={(e) => { setDeassignEntryId(e.target.value); setDeassignQty(""); }}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">— Select product —</option>
-                    {riderInventories.filter(e => (!deassignRiderId || String(e.riderId) === deassignRiderId) && e.currentQty > 0).map((e: any) => (
-                      <option key={e.id} value={e.id}>{e.productName}{e.productSku ? ` (${e.productSku})` : ""} — {e.currentQty} in hand</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>
-                    Quantity *
-                    {deassignEntryId && (() => {
-                      const entry = riderInventories.find(e => String(e.id) === deassignEntryId);
-                      return entry ? <span className="text-muted-foreground font-normal"> (max {entry.currentQty})</span> : null;
-                    })()}
-                  </Label>
-                  <Input
-                    type="number" min="1"
-                    max={riderInventories.find(e => String(e.id) === deassignEntryId)?.currentQty ?? 9999}
-                    placeholder="e.g. 5"
-                    value={deassignQty}
-                    onChange={(e) => setDeassignQty(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
-                <Button
-                  type="button"
-                  className="bg-orange-600 hover:bg-orange-700"
-                  disabled={returnPending || !deassignEntryId || !deassignQty || Number(deassignQty) <= 0}
-                  onClick={handleDeassign}
-                >
-                  {returnPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Deassign
-                </Button>
-              </DialogFooter>
+          <div className="grid gap-4 py-3">
+            <div className="space-y-2">
+              <Label>Rider *</Label>
+              {assignDialogTab === "assign" ? (
+                <SearchableSelect
+                  options={(riders ?? []).map((r: any) => ({ value: String(r.id), label: `${r.name} (${r.phone})` }))}
+                  value={assignRiderId}
+                  onChange={setAssignRiderId}
+                  placeholder="— Search rider —"
+                />
+              ) : (
+                <SearchableSelect
+                  options={Array.from(new Map(riderInventories.filter(e => e.currentQty > 0).map(e => [e.riderId, e])).values()).map((e: any) => ({ value: String(e.riderId), label: e.riderName }))}
+                  value={deassignRiderId}
+                  onChange={(v) => { setDeassignRiderId(v); setDeassignEntryId(""); setDeassignQty(""); }}
+                  placeholder="— Search rider —"
+                />
+              )}
             </div>
-          )}
+
+            <div className="space-y-2">
+              <Label>Product *</Label>
+              {assignDialogTab === "assign" ? (
+                <SearchableSelect
+                  options={(rawEntries ?? []).filter((e: any) => e.currentStock > 0).map((e: any) => ({ value: String(e.id), label: `${e.productName}${e.productSku ? ` (${e.productSku})` : ""} — ${e.currentStock} in stock` }))}
+                  value={assignStockId}
+                  onChange={setAssignStockId}
+                  placeholder="— Search product —"
+                />
+              ) : (
+                <SearchableSelect
+                  options={riderInventories.filter(e => (!deassignRiderId || String(e.riderId) === deassignRiderId) && e.currentQty > 0).map((e: any) => ({ value: String(e.id), label: `${e.productName}${e.productSku ? ` (${e.productSku})` : ""} — ${e.currentQty} in hand` }))}
+                  value={deassignEntryId}
+                  onChange={(v) => { setDeassignEntryId(v); setDeassignQty(""); }}
+                  placeholder="— Search product —"
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                Quantity *
+                {assignDialogTab === "deassign" && deassignEntryId && (() => {
+                  const entry = riderInventories.find(e => String(e.id) === deassignEntryId);
+                  return entry ? <span className="text-muted-foreground font-normal"> (max {entry.currentQty})</span> : null;
+                })()}
+              </Label>
+              <Input
+                type="number" min="1"
+                max={assignDialogTab === "deassign" ? (riderInventories.find(e => String(e.id) === deassignEntryId)?.currentQty ?? 9999) : undefined}
+                placeholder="e.g. 20"
+                value={assignDialogTab === "assign" ? assignQty : deassignQty}
+                onChange={(e) => assignDialogTab === "assign" ? setAssignQty(e.target.value) : setDeassignQty(e.target.value)}
+              />
+            </div>
+
+            {assignDialogTab === "assign" && (
+              <div className="space-y-2">
+                <Label>Note (optional)</Label>
+                <Input
+                  placeholder="e.g. For Kathmandu route"
+                  value={assignNote}
+                  onChange={(e) => setAssignNote(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogMode(null)}>Cancel</Button>
+            {assignDialogTab === "assign" ? (
+              <Button
+                type="button"
+                disabled={assignPending || !assignRiderId || !assignStockId || !assignQty || Number(assignQty) <= 0}
+                onClick={handleAssignInventory}
+              >
+                {assignPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Assign
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                className="bg-orange-600 hover:bg-orange-700"
+                disabled={returnPending || !deassignEntryId || !deassignQty || Number(deassignQty) <= 0}
+                onClick={handleDeassign}
+              >
+                {returnPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Deassign
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

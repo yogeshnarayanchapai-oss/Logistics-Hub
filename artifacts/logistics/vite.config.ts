@@ -72,6 +72,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path,
       },
+      "/docs": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
     },
   },
   preview: {

@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SwiftShip — System Documentation</title>
+<style>
+  :root {
+    --red: #DC2626; --red-light: #FEE2E2; --red-mid: #FCA5A5;
+    --blue: #1D4ED8; --blue-light: #DBEAFE; --blue-mid: #93C5FD;
+    --green: #059669; --green-light: #D1FAE5; --green-mid: #6EE7B7;
+    --amber: #D97706; --amber-light: #FEF3C7; --amber-mid: #FCD34D;
+    --purple: #7C3AED; --purple-light: #EDE9FE; --purple-mid: #C4B5FD;
+    --gray: #6B7280; --gray-light: #F3F4F6; --gray-dark: #1F2937;
+    --teal: #0D9488; --teal-light: #CCFBF1;
+    --ink: #111827; --white: #FFFFFF;
+    --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{font-size:13px;}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#F8FAFC;color:var(--ink);line-height:1.6;}
+  a{color:var(--blue);text-decoration:none;}
+
+  /* ── Print ── */
+  @media print {
+    body{background:#fff;font-size:11pt;}
+    .no-print{display:none!important;}
+    .page{page-break-after:always;break-after:page;box-shadow:none!important;border-radius:0!important;border:none!important;}
+    .page:last-child{page-break-after:auto;}
+    svg text{font-family:'Segoe UI',Arial,sans-serif!important;}
+    @page{size:A4;margin:12mm 14mm;}
+  }
+
+  /* ── Layout ── */
+  .container{max-width:900px;margin:0 auto;padding:24px 16px 48px;}
+  .page{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:28px;overflow:hidden;}
+
+  /* ── Print button ── */
+  .print-bar{background:var(--gray-dark);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:99;}
+  .print-bar span{font-size:.9rem;opacity:.8;}
+  .btn-print{background:var(--red);color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:.85rem;cursor:pointer;font-weight:600;}
+  .btn-print:hover{background:#B91C1C;}
+
+  /* ── COVER PAGE ── */
+  .cover{min-height:520px;background:linear-gradient(135deg,#1e1e2e 0%,#1a1a3e 40%,#2d1b69 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 40px;position:relative;overflow:hidden;}
+  .cover::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");}</
+  .cover-badge{background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.5);color:#FCA5A5;font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding:4px 16px;border-radius:20px;margin-bottom:20px;}
+  .cover-logo{width:64px;height:64px;background:var(--red);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;}
+  .cover h1{font-size:2.6rem;font-weight:800;color:#fff;line-height:1.15;margin-bottom:8px;letter-spacing:-.03em;}
+  .cover h1 span{color:#FCA5A5;}
+  .cover-sub{color:#94A3B8;font-size:1rem;margin-bottom:32px;}
+  .cover-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:36px;}
+  .chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#CBD5E1;font-size:.72rem;padding:5px 14px;border-radius:20px;font-weight:500;}
+  .cover-meta{display:flex;gap:40px;justify-content:center;}
+  .cover-meta-item{text-align:center;}
+  .cover-meta-num{font-size:1.8rem;font-weight:800;color:#fff;}
+  .cover-meta-lbl{font-size:.7rem;color:#64748B;letter-spacing:.1em;text-transform:uppercase;}
+
+  /* ── Section headers ── */
+  .sec-header{padding:24px 28px 16px;border-bottom:1px solid #F1F5F9;}
+  .sec-header h2{font-size:1.25rem;font-weight:700;color:var(--ink);}
+  .sec-header p{color:var(--gray);font-size:.85rem;margin-top:2px;}
+  .sec-tag{display:inline-block;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:3px 10px;border-radius:20px;margin-bottom:6px;}
+  .sec-body{padding:20px 28px 28px;}
+
+  /* ── TOC ── */
+  .toc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .toc-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:var(--gray-light);border:1px solid #E5E7EB;}
+  .toc-num{width:28px;height:28px;border-radius:50%;font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .toc-label{font-size:.83rem;font-weight:600;}
+  .toc-sub{font-size:.72rem;color:var(--gray);}
+
+  /* ── Cards / badges ── */
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px;}
+  .card{background:var(--gray-light);border-radius:8px;padding:16px;border:1px solid #E5E7EB;}
+  .card h4{font-size:.85rem;font-weight:700;margin-bottom:4px;}
+  .card p{font-size:.75rem;color:var(--gray);}
+  .role-badge{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:3px 9px;border-radius:20px;margin:2px 2px 2px 0;}
+
+  /* ── Portal header band ── */
+  .portal-header{padding:20px 28px;display:flex;align-items:flex-start;gap:16px;}
+  .portal-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+  .portal-title h3{font-size:1.1rem;font-weight:700;}
+  .portal-title p{font-size:.8rem;color:var(--gray);margin-top:2px;}
+
+  /* ── Feature list ── */
+  .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+  .feature-item{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;background:var(--gray-light);border-radius:6px;}
+  .feature-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+  .feature-text h5{font-size:.8rem;font-weight:600;}
+  .feature-text p{font-size:.72rem;color:var(--gray);}
+
+  /* ── Permission matrix ── */
+  .perm-table{width:100%;border-collapse:collapse;font-size:.73rem;margin-top:12px;}
+  .perm-table th{background:var(--gray-dark);color:#fff;padding:7px 10px;text-align:left;font-weight:600;}
+  .perm-table th.center,.perm-table td.center{text-align:center;}
+  .perm-table tr:nth-child(even) td{background:#F9FAFB;}
+  .perm-table td{padding:6px 10px;border-bottom:1px solid #E5E7EB;}
+  .perm-table tr:hover td{background:#EFF6FF;}
+  .check{color:var(--green);font-size:.9rem;font-weight:700;}
+  .cross{color:#D1D5DB;font-size:.9rem;}
+  .partial{color:var(--amber);font-size:.9rem;}
+
+  /* ── Workflow steps ── */
+  .steps{display:flex;flex-direction:column;gap:0;}
+  .step{display:flex;gap:16px;padding:12px 0;}
+  .step+.step{border-top:1px dashed #E5E7EB;}
+  .step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;flex-shrink:0;margin-top:1px;}
+  .step-body h5{font-size:.83rem;font-weight:700;}
+  .step-body p{font-size:.75rem;color:var(--gray);}
+
+  /* ── SVG flowchart wrappers ── */
+  .flow-wrap{padding:16px 0;overflow-x:auto;}
+  .flow-wrap svg{display:block;margin:0 auto;}
+
+  /* ── Info strips ── */
+  .info-strip{display:flex;gap:8px;padding:10px 14px;border-radius:8px;font-size:.78rem;margin-bottom:14px;}
+  .info-strip.blue{background:var(--blue-light);border-left:3px solid var(--blue);}
+  .info-strip.amber{background:var(--amber-light);border-left:3px solid var(--amber);}
+  .info-strip.green{background:var(--green-light);border-left:3px solid var(--green);}
+
+  /* ── Divider ── */
+  .divider{height:1px;background:#F1F5F9;margin:20px 0;}
+
+  /* ── Screenshot placeholder ── */
+  .ss-placeholder{background:var(--gray-light);border:2px dashed #D1D5DB;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;margin:8px 0;}
+  .ss-placeholder .ss-icon{font-size:2rem;margin-bottom:6px;}
+  .ss-placeholder .ss-label{font-size:.8rem;font-weight:700;color:var(--gray-dark);}
+  .ss-placeholder .ss-route{font-size:.7rem;color:var(--blue);font-family:monospace;background:var(--blue-light);padding:2px 8px;border-radius:4px;margin-top:4px;}
+
+  /* ── Two-column layout ── */
+  .col2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .col3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+
+  /* ── Colored highlight box ── */
+  .highlight{border-radius:8px;padding:14px 16px;margin-top:12px;}
+  .highlight h5{font-size:.83rem;font-weight:700;margin-bottom:4px;}
+  .highlight ul{padding-left:16px;}
+  .highlight ul li{font-size:.78rem;line-height:1.7;}
+
+  /* ── Roles legend ── */
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<!-- Print bar -->
+<div class="print-bar no-print">
+  <span>SwiftShip — System Documentation &nbsp;|&nbsp; Open in browser → Ctrl+P → Save as PDF</span>
+  <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════════ COVER ═══════════════════════════════ -->
+<div class="page cover">
+  <div class="cover-badge">System Documentation v1.0</div>
+  <div class="cover-logo">🚚</div>
+  <h1>Swift<span>Ship</span></h1>
+  <div class="cover-sub">Full-Stack Logistics & Delivery Management System<br>Nepal Courier Operations Platform</div>
+  <div class="cover-chips">
+    <span class="chip">Admin Portal</span><span class="chip">Manager Portal</span>
+    <span class="chip">Vendor Portal</span><span class="chip">Rider Portal</span>
+    <span class="chip">Staff Portal</span>
+    <span class="chip">React + Vite</span><span class="chip">Express API</span><span class="chip">PostgreSQL</span>
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item"><div class="cover-meta-num">5</div><div class="cover-meta-lbl">Portals</div></div>
+    <div class="cover-meta-item"><div class="cover-meta-num">25+</div><div class="cover-meta-lbl">Pages</div></div>
+    <div class="cover-meta-item"><div class="cover-meta-num">60+</div><div class="cover-meta-lbl">API Endpoints</div></div>
+    <div class="cover-meta-item"><div class="cover-meta-num">8</div><div class="cover-meta-lbl">Core Modules</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ TABLE OF CONTENTS ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#F3F4F6;color:#374151;">NAVIGATION</span>
+    <h2>Table of Contents</h2>
+  </div>
+  <div class="sec-body">
+    <div class="toc-grid">
+      <div class="toc-item"><div class="toc-num" style="background:#1F2937;color:#fff;">1</div><div><div class="toc-label">System Overview</div><div class="toc-sub">Architecture, technology stack, key metrics</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#1F2937;color:#fff;">2</div><div><div class="toc-label">Role & Access Overview</div><div class="toc-sub">User roles, login flow, permission matrix</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#DC2626;color:#fff;">3</div><div><div class="toc-label">Admin Portal</div><div class="toc-sub">Full system control, users, settings, audit</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#1D4ED8;color:#fff;">4</div><div><div class="toc-label">Manager Portal</div><div class="toc-sub">Operations, orders, riders, vendors</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#7C3AED;color:#fff;">5</div><div><div class="toc-label">Vendor Portal</div><div class="toc-sub">Orders, payments, reports, COD tracking</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#059669;color:#fff;">6</div><div><div class="toc-label">Rider Portal</div><div class="toc-sub">Deliveries, inventory, commissions</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#D97706;color:#fff;">7</div><div><div class="toc-label">System Flowcharts</div><div class="toc-sub">Order lifecycle, payment flow, login flow</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#0D9488;color:#fff;">8</div><div><div class="toc-label">Permission Matrix</div><div class="toc-sub">Full RBAC grid — every module × every role</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#6B7280;color:#fff;">9</div><div><div class="toc-label">API Reference</div><div class="toc-sub">Core endpoints by module</div></div></div>
+      <div class="toc-item"><div class="toc-num" style="background:#6B7280;color:#fff;">10</div><div><div class="toc-label">Data Models</div><div class="toc-sub">Key tables and relationships</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 1. SYSTEM OVERVIEW ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#F3F4F6;color:#374151;">SECTION 1</span>
+    <h2>System Overview</h2>
+    <p>Architecture, technology stack, and high-level capabilities of SwiftShip</p>
+  </div>
+  <div class="sec-body">
+    <div class="info-strip blue">
+      SwiftShip is a full-stack, role-based logistics management system designed for Nepal-based courier companies. It covers the complete delivery lifecycle — from order creation by vendors to last-mile delivery by riders — with integrated payments, inventory, and reporting.
+    </div>
+    <div class="col3">
+      <div class="card"><h4>🖥️ Frontend</h4><p>React 18 + Vite + TypeScript<br>Tailwind CSS, shadcn/ui<br>TanStack Query (data fetching)<br>Port 5000</p></div>
+      <div class="card"><h4>⚙️ Backend API</h4><p>Node.js + Express 5<br>REST API with JWT Auth<br>Drizzle ORM + PostgreSQL<br>Port 8080</p></div>
+      <div class="card"><h4>🗄️ Database</h4><p>PostgreSQL (Neon/Replit)<br>Drizzle schema migrations<br>Audit logging<br>Real-time notifications</p></div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.9rem;font-weight:700;margin-bottom:12px;">System Architecture</h4>
+
+    <!-- Architecture SVG -->
+    <div class="flow-wrap">
+      <svg width="820" height="320" viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94A3B8"/></marker>
+          <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.08"/></filter>
+        </defs>
+        <!-- Browser -->
+        <rect x="8" y="60" width="130" height="200" rx="10" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1.5" filter="url(#sh)"/>
+        <text x="73" y="80" text-anchor="middle" font-size="11" font-weight="700" fill="#1D4ED8">USER BROWSER</text>
+        <rect x="18" y="90" width="110" height="22" rx="5" fill="#DC2626"/><text x="73" y="105" text-anchor="middle" font-size="9.5" fill="#fff">Admin / Manager</text>
+        <rect x="18" y="117" width="110" height="22" rx="5" fill="#7C3AED"/><text x="73" y="132" text-anchor="middle" font-size="9.5" fill="#fff">Vendor</text>
+        <rect x="18" y="144" width="110" height="22" rx="5" fill="#059669"/><text x="73" y="159" text-anchor="middle" font-size="9.5" fill="#fff">Rider</text>
+        <rect x="18" y="171" width="110" height="22" rx="5" fill="#D97706"/><text x="73" y="186" text-anchor="middle" font-size="9.5" fill="#fff">Staff</text>
+        <text x="73" y="224" text-anchor="middle" font-size="9" fill="#6B7280">React + Vite SPA</text>
+        <text x="73" y="238" text-anchor="middle" font-size="9" fill="#6B7280">JWT Auth Token</text>
+
+        <!-- Arrow Browser → API -->
+        <line x1="138" y1="160" x2="195" y2="160" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="166" y="155" text-anchor="middle" font-size="8.5" fill="#6B7280">HTTPS</text>
+
+        <!-- API Server box -->
+        <rect x="197" y="40" width="170" height="240" rx="10" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" filter="url(#sh)"/>
+        <rect x="197" y="40" width="170" height="28" rx="10" fill="#1F2937"/>
+        <text x="282" y="58" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">EXPRESS API SERVER</text>
+        <text x="282" y="76" text-anchor="middle" font-size="9" fill="#6B7280">Port 8080 · Node.js + Drizzle ORM</text>
+        <rect x="207" y="82" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="93" text-anchor="middle" font-size="8.5" fill="#374151">🔐 /api/auth (login, me)</text>
+        <rect x="207" y="102" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="113" text-anchor="middle" font-size="8.5" fill="#374151">📦 /api/orders (CRUD + status)</text>
+        <rect x="207" y="122" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="133" text-anchor="middle" font-size="8.5" fill="#374151">👥 /api/users, vendors, riders</text>
+        <rect x="207" y="142" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="153" text-anchor="middle" font-size="8.5" fill="#374151">💰 /api/payment-requests</text>
+        <rect x="207" y="162" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="173" text-anchor="middle" font-size="8.5" fill="#374151">📊 /api/dashboard/*</text>
+        <rect x="207" y="182" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="193" text-anchor="middle" font-size="8.5" fill="#374151">📬 /api/notifications</text>
+        <rect x="207" y="202" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="213" text-anchor="middle" font-size="8.5" fill="#374151">🏪 /api/stock, rider-inventory</text>
+        <rect x="207" y="222" width="150" height="16" rx="4" fill="#F1F5F9"/><text x="282" y="233" text-anchor="middle" font-size="8.5" fill="#374151">🎫 /api/tickets, audit-logs</text>
+        <text x="282" y="258" text-anchor="middle" font-size="9" fill="#6B7280">JWT Middleware · Role Guards</text>
+
+        <!-- Arrow API → DB -->
+        <line x1="367" y1="160" x2="424" y2="160" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="395" y="155" text-anchor="middle" font-size="8.5" fill="#6B7280">Drizzle</text>
+
+        <!-- PostgreSQL -->
+        <rect x="426" y="60" width="155" height="200" rx="10" fill="#F0FDF4" stroke="#BBF7D0" stroke-width="1.5" filter="url(#sh)"/>
+        <rect x="426" y="60" width="155" height="28" rx="10" fill="#065F46"/>
+        <text x="503" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">POSTGRESQL DB</text>
+        <text x="503" y="100" text-anchor="middle" font-size="9" fill="#6B7280">orders · order_status_history</text>
+        <text x="503" y="115" text-anchor="middle" font-size="9" fill="#6B7280">users · vendors · riders</text>
+        <text x="503" y="130" text-anchor="middle" font-size="9" fill="#6B7280">stations · stock · stock_movements</text>
+        <text x="503" y="145" text-anchor="middle" font-size="9" fill="#6B7280">rider_inventory</text>
+        <text x="503" y="160" text-anchor="middle" font-size="9" fill="#6B7280">payment_requests · bank_accounts</text>
+        <text x="503" y="175" text-anchor="middle" font-size="9" fill="#6B7280">rider_payment_requests</text>
+        <text x="503" y="190" text-anchor="middle" font-size="9" fill="#6B7280">rider_commissions · rider_bank_accounts</text>
+        <text x="503" y="205" text-anchor="middle" font-size="9" fill="#6B7280">notifications · audit_logs</text>
+        <text x="503" y="220" text-anchor="middle" font-size="9" fill="#6B7280">tickets · ticket_messages</text>
+        <text x="503" y="235" text-anchor="middle" font-size="9" fill="#6B7280">app_settings · support_contacts</text>
+
+        <!-- Deployment note -->
+        <rect x="610" y="100" width="200" height="120" rx="10" fill="#FEFCE8" stroke="#FDE68A" stroke-width="1.5"/>
+        <text x="710" y="118" text-anchor="middle" font-size="10" font-weight="700" fill="#92400E">DEPLOYMENT</text>
+        <text x="710" y="136" text-anchor="middle" font-size="9" fill="#78350F">logisticshub.replit.app</text>
+        <text x="710" y="154" text-anchor="middle" font-size="9" fill="#78350F">Replit Cloud · Always-on</text>
+        <text x="710" y="172" text-anchor="middle" font-size="9" fill="#78350F">Static files served from</text>
+        <text x="710" y="186" text-anchor="middle" font-size="9" fill="#78350F">Express in production</text>
+        <text x="710" y="204" text-anchor="middle" font-size="9" fill="#78350F">Neon PostgreSQL</text>
+        <line x1="581" y1="160" x2="610" y2="160" stroke="#FDE68A" stroke-width="1.5" stroke-dasharray="4 3"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 2. ROLES & ACCESS ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#F3F4F6;color:#374151;">SECTION 2</span>
+    <h2>Role &amp; Access Overview</h2>
+    <p>User roles, login credentials, and portal routing</p>
+  </div>
+  <div class="sec-body">
+    <div class="card-grid">
+      <div class="card" style="border-left:4px solid #DC2626;">
+        <h4>🔴 Admin</h4>
+        <p>Full system access. Can manage users, settings, audit logs, bank accounts, all data. Only role that can delete entities or change system configuration.</p>
+        <div style="margin-top:6px;"><span class="role-badge" style="background:#FEE2E2;color:#991B1B;">All modules</span></div>
+      </div>
+      <div class="card" style="border-left:4px solid #1D4ED8;">
+        <h4>🔵 Manager</h4>
+        <p>Operations control. Manages orders, riders, vendors, stations, payments. Cannot access user management, audit logs, or system settings.</p>
+        <div style="margin-top:6px;"><span class="role-badge" style="background:#DBEAFE;color:#1E40AF;">Operations</span></div>
+      </div>
+      <div class="card" style="border-left:4px solid #D97706;">
+        <h4>🟠 Staff</h4>
+        <p>Limited read access. Can view orders and use support tickets. Cannot create, assign, or approve orders. Read-only role for tracking staff.</p>
+        <div style="margin-top:6px;"><span class="role-badge" style="background:#FEF3C7;color:#92400E;">View only</span></div>
+      </div>
+      <div class="card" style="border-left:4px solid #7C3AED;">
+        <h4>🟣 Vendor</h4>
+        <p>Business client portal. Creates and tracks their own orders, manages COD payments, views performance reports, manages bank accounts.</p>
+        <div style="margin-top:6px;"><span class="role-badge" style="background:#EDE9FE;color:#5B21B6;">Own data</span></div>
+      </div>
+      <div class="card" style="border-left:4px solid #059669;">
+        <h4>🟢 Rider</h4>
+        <p>Field delivery agent portal. Views assigned orders, updates pickup/delivery status, manages physical inventory, tracks commission earnings.</p>
+        <div style="margin-top:6px;"><span class="role-badge" style="background:#D1FAE5;color:#065F46;">Assigned orders</span></div>
+      </div>
+      <div class="card" style="background:#FFFBEB;border:1px solid #FDE68A;">
+        <h4>ℹ️ Branch Manager / Accountant</h4>
+        <p>These functional roles map to <strong>Manager</strong> (branch operations) and <strong>Admin/Manager</strong> (payment approval) within the current RBAC system. No separate portal — same interface with appropriate permissions.</p>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Login &amp; Role Routing Flow</h4>
+    <div class="flow-wrap">
+      <svg width="780" height="200" viewBox="0 0 780 200" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="a2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#64748B"/></marker></defs>
+        <!-- Login box -->
+        <rect x="10" y="75" width="110" height="50" rx="8" fill="#1F2937"/>
+        <text x="65" y="97" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">LOGIN PAGE</text>
+        <text x="65" y="112" text-anchor="middle" font-size="9" fill="#94A3B8">/login</text>
+        <line x1="120" y1="100" x2="160" y2="100" stroke="#64748B" stroke-width="1.5" marker-end="url(#a2)"/>
+
+        <!-- JWT decode -->
+        <rect x="162" y="75" width="120" height="50" rx="8" fill="#374151"/>
+        <text x="222" y="94" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff">JWT TOKEN</text>
+        <text x="222" y="108" text-anchor="middle" font-size="8.5" fill="#9CA3AF">Issued on success</text>
+        <text x="222" y="120" text-anchor="middle" font-size="8.5" fill="#9CA3AF">Stored in localStorage</text>
+        <line x1="282" y1="100" x2="322" y2="100" stroke="#64748B" stroke-width="1.5" marker-end="url(#a2)"/>
+
+        <!-- Role check -->
+        <polygon points="365,75 405,100 365,125 325,100" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/>
+        <text x="365" y="97" text-anchor="middle" font-size="9" font-weight="700" fill="#92400E">ROLE</text>
+        <text x="365" y="110" text-anchor="middle" font-size="9" font-weight="700" fill="#92400E">CHECK</text>
+
+        <!-- Branches -->
+        <line x1="365" y1="75" x2="365" y2="40" stroke="#DC2626" stroke-width="1.5" marker-end="url(#a2)"/>
+        <text x="395" y="35" font-size="8.5" fill="#DC2626">admin / manager / staff</text>
+        <rect x="490" y="15" width="110" height="32" rx="6" fill="#FEE2E2" stroke="#FCA5A5" stroke-width="1"/>
+        <text x="545" y="30" text-anchor="middle" font-size="9" fill="#991B1B" font-weight="700">/admin/*</text>
+        <text x="545" y="42" text-anchor="middle" font-size="8" fill="#991B1B">Admin Dashboard</text>
+
+        <line x1="405" y1="100" x2="490" y2="100" stroke="#7C3AED" stroke-width="1.5" marker-end="url(#a2)"/>
+        <text x="443" y="95" text-anchor="middle" font-size="8.5" fill="#7C3AED">vendor</text>
+        <rect x="490" y="80" width="110" height="32" rx="6" fill="#EDE9FE" stroke="#C4B5FD" stroke-width="1"/>
+        <text x="545" y="95" text-anchor="middle" font-size="9" fill="#5B21B6" font-weight="700">/vendor/*</text>
+        <text x="545" y="107" text-anchor="middle" font-size="8" fill="#5B21B6">Vendor Dashboard</text>
+
+        <line x1="365" y1="125" x2="365" y2="160" stroke="#059669" stroke-width="1.5" marker-end="url(#a2)"/>
+        <text x="395" y="170" font-size="8.5" fill="#059669">rider</text>
+        <rect x="490" y="145" width="110" height="32" rx="6" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1"/>
+        <text x="545" y="160" text-anchor="middle" font-size="9" fill="#065F46" font-weight="700">/rider/*</text>
+        <text x="545" y="172" text-anchor="middle" font-size="8" fill="#065F46">Rider Dashboard</text>
+
+        <!-- Protected Route label -->
+        <rect x="610" y="40" width="160" height="120" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+        <text x="690" y="60" text-anchor="middle" font-size="10" font-weight="700" fill="#374151">Protected Route</text>
+        <text x="690" y="78" text-anchor="middle" font-size="8.5" fill="#6B7280">Each route validates</text>
+        <text x="690" y="92" text-anchor="middle" font-size="8.5" fill="#6B7280">user.role against</text>
+        <text x="690" y="106" text-anchor="middle" font-size="8.5" fill="#6B7280">ADMIN_ROLES /</text>
+        <text x="690" y="120" text-anchor="middle" font-size="8.5" fill="#6B7280">VENDOR_ROLES /</text>
+        <text x="690" y="134" text-anchor="middle" font-size="8.5" fill="#6B7280">RIDER_ROLES</text>
+        <text x="690" y="150" text-anchor="middle" font-size="8" fill="#EF4444">→ 403 if mismatch</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 3. ADMIN PORTAL ═══════════════════════════════ -->
+<div class="page">
+  <div class="portal-header" style="background:linear-gradient(90deg,#FEF2F2,#fff);">
+    <div class="portal-icon" style="background:#DC2626;color:#fff;">👑</div>
+    <div class="portal-title">
+      <h3>Admin Portal</h3>
+      <p>Route prefix: <code>/admin/*</code> &nbsp;·&nbsp; Role: <strong>admin</strong> (and some sections: manager, staff)</p>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="info-strip blue">The Admin portal provides complete control over all system data, users, settings, and financial operations. The Admin is the only role that can access user management, audit logs, system branding settings, and corporate bank accounts.</div>
+
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;margin-top:14px;">Sidebar Modules</h4>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#DC2626;"></div>
+        <div class="feature-text"><h5>Dashboard</h5><p>KPI overview: total orders, revenue, COD summary, active riders, vendor stats, performance charts</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#1D4ED8;"></div>
+        <div class="feature-text"><h5>Orders</h5><p>View/search all orders across all vendors. Filter by status, station, date. Create new orders.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#7C3AED;"></div>
+        <div class="feature-text"><h5>Assign Orders</h5><p>Batch assign unassigned orders to riders. Select multiple orders, pick a rider, assign with one click.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#F59E0B;"></div>
+        <div class="feature-text"><h5>Duplicate Review</h5><p>Review orders flagged as potential duplicates (same customer phone + address). Confirm or dismiss flags.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#059669;"></div>
+        <div class="feature-text"><h5>Vendors</h5><p>Create/edit vendor accounts, set commission rates, view vendor performance summary.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#0891B2;"></div>
+        <div class="feature-text"><h5>Riders</h5><p>Manage rider profiles, assign coverage stations, view commission earnings, backfill commissions.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#BE185D;"></div>
+        <div class="feature-text"><h5>Stations</h5><p>Manage delivery hubs/branches. Each order and rider is linked to a station.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#D97706;"></div>
+        <div class="feature-text"><h5>Stock Inventory</h5><p>Manage physical product stock. Stock-in/out movements, rider inventory assignment and returns.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#DC2626;"></div>
+        <div class="feature-text"><h5>Payments</h5><p>Process vendor payment requests (approve → release). Manage rider commission payouts. View all transactions.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#1F2937;"></div>
+        <div class="feature-text"><h5>Users <span style="color:#DC2626">*Admin only</span></h5><p>Create/edit/delete all platform users. Reset passwords. View linked vendor/rider profiles.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#1F2937;"></div>
+        <div class="feature-text"><h5>Bank Accounts <span style="color:#DC2626">*Admin only</span></h5><p>Manage corporate bank accounts used for vendor payouts.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#1F2937;"></div>
+        <div class="feature-text"><h5>Audit Logs <span style="color:#DC2626">*Admin only</span></h5><p>Immutable log of all create/update/delete actions by all users with timestamp and IP.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#1F2937;"></div>
+        <div class="feature-text"><h5>Settings <span style="color:#DC2626">*Admin only</span></h5><p>System branding (logo, name, tagline), general configuration, support contact management.</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-dot" style="background:#6B7280;"></div>
+        <div class="feature-text"><h5>Support Tickets</h5><p>View and respond to all tickets from vendors and riders. Real-time message thread per ticket.</p></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;">Admin Dashboard KPIs</h4>
+    <div class="col3">
+      <div class="highlight" style="background:#FEF2F2;">
+        <h5 style="color:#DC2626;">Order Metrics</h5>
+        <ul><li>Total orders today / this month</li><li>Orders by status (pending, in-transit, delivered, returned)</li><li>Delivery success rate %</li></ul>
+      </div>
+      <div class="highlight" style="background:#DBEAFE;">
+        <h5 style="color:#1D4ED8;">Financial</h5>
+        <ul><li>Total COD collected</li><li>Amount pending release</li><li>Amount already released</li><li>Vendor payment queue</li></ul>
+      </div>
+      <div class="highlight" style="background:#D1FAE5;">
+        <h5 style="color:#059669;">Operations</h5>
+        <ul><li>Active riders count</li><li>Top performing riders</li><li>Station performance breakdown</li><li>Open support tickets</li></ul>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;">Screenshot References</h4>
+    <div class="col2">
+      <div class="ss-placeholder"><div class="ss-icon">📊</div><div class="ss-label">Admin Dashboard</div><div class="ss-route">/admin/dashboard</div></div>
+      <div class="ss-placeholder"><div class="ss-icon">📋</div><div class="ss-label">All Orders List</div><div class="ss-route">/admin/orders</div></div>
+      <div class="ss-placeholder"><div class="ss-icon">🏍️</div><div class="ss-label">Assign Orders</div><div class="ss-route">/admin/assign-orders</div></div>
+      <div class="ss-placeholder"><div class="ss-icon">👥</div><div class="ss-label">User Management</div><div class="ss-route">/admin/users</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 4. MANAGER PORTAL ═══════════════════════════════ -->
+<div class="page">
+  <div class="portal-header" style="background:linear-gradient(90deg,#EFF6FF,#fff);">
+    <div class="portal-icon" style="background:#1D4ED8;color:#fff;">🗂️</div>
+    <div class="portal-title">
+      <h3>Manager Portal</h3>
+      <p>Route prefix: <code>/admin/*</code> (shared with admin) &nbsp;·&nbsp; Role: <strong>manager</strong></p>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="info-strip blue">Managers have full operational access but cannot modify system settings, manage users, view audit logs, or access corporate bank accounts. This role is ideal for branch managers and operations supervisors.</div>
+
+    <div class="feature-grid">
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Dashboard</h5><p>Same KPI dashboard as admin — all order metrics, financial overview, performance charts</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Orders (Full)</h5><p>Create, edit, bulk upload, search, filter, view detail, update status for all orders</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Assign Orders</h5><p>Batch assign unassigned orders to any rider</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Duplicate Review</h5><p>Review and resolve flagged duplicate orders</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Vendors</h5><p>Create, edit vendor accounts and commission rates</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Riders</h5><p>Create, edit rider profiles, assign stations</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Stations</h5><p>Create and manage delivery stations/hubs</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Payments</h5><p>Approve and release vendor/rider payments — acts as Accountant role</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#1D4ED8;"></div><div class="feature-text"><h5>Stock Inventory</h5><p>Manage product inventory, assign/return rider stock</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#6B7280;"></div><div class="feature-text"><h5>Support Tickets</h5><p>Read and respond to tickets from vendors/riders</p></div></div>
+    </div>
+
+    <div class="info-strip amber" style="margin-top:16px;">
+      <strong>Restricted from:</strong> User management (/admin/users), Audit Logs, System Settings, Bank Accounts management. These pages redirect or show access denied for the manager role.
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;">Staff Role (Read-Only)</h4>
+    <div class="info-strip green">Staff is a minimal access role — can view orders, use support tickets, view dashboard. Cannot create orders, assign riders, or access financial data. Suitable for tracking/dispatch staff.</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="feature-dot" style="background:#D97706;"></div><div class="feature-text"><h5>Dashboard</h5><p>View summary metrics (read-only)</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#D97706;"></div><div class="feature-text"><h5>Orders</h5><p>View and search orders only. No create/edit/delete.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#D97706;"></div><div class="feature-text"><h5>Support Tickets</h5><p>Create and respond to support tickets</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#D97706;"></div><div class="feature-text"><h5>Notifications</h5><p>View system notifications</p></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 5. VENDOR PORTAL ═══════════════════════════════ -->
+<div class="page">
+  <div class="portal-header" style="background:linear-gradient(90deg,#F5F3FF,#fff);">
+    <div class="portal-icon" style="background:#7C3AED;color:#fff;">🏪</div>
+    <div class="portal-title">
+      <h3>Vendor Portal</h3>
+      <p>Route prefix: <code>/vendor/*</code> &nbsp;·&nbsp; Role: <strong>vendor</strong> &nbsp;·&nbsp; Data: own orders/payments only</p>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="info-strip blue">Vendors are business clients who ship products via SwiftShip. They can create orders, track deliveries, view COD (Cash on Delivery) earnings, request payment settlements, and analyse their performance. All data is strictly filtered to their own account.</div>
+
+    <div class="feature-grid">
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>Dashboard</h5><p>Personal KPIs: order counts by status, COD summary (pending/released), today's delivery activity, recent comments</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>My Orders</h5><p>View all own orders with full filter/search. Track each order status in real-time.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>Create Order</h5><p>Single order creation form: customer details, pickup address, package info, COD amount.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>Bulk Order Upload</h5><p>Upload Excel file or use grid to create multiple orders at once. Preview before submit.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>Payments — COD Payment</h5><p>View released (completed) COD payments. S.No, Transfer ID, Date, Amount, Bank. Download PDF statement.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>Payments — Payment Request</h5><p>Submit new payment withdrawal requests. Track status (pending → approved → released).</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>Bank Accounts</h5><p>Manage bank/wallet accounts for receiving payouts. Add multiple accounts.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>My Reports</h5><p>Business analytics: delivery rates, COD trends, order volume charts, top products.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#7C3AED;"></div><div class="feature-text"><h5>Today's Comments</h5><p>Daily log of rider comments on own orders — customer feedback, failed delivery notes.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#6B7280;"></div><div class="feature-text"><h5>Stock Inventory</h5><p>View own product stock levels managed by the logistics company.</p></div></div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;">Vendor Payment Workflow</h4>
+    <div class="steps">
+      <div class="step"><div class="step-num" style="background:#EDE9FE;color:#5B21B6;">1</div><div class="step-body"><h5>Order Delivered → COD Collected</h5><p>When rider marks order as "delivered", COD amount is recorded against the vendor's account. Status: <strong>pending release</strong>.</p></div></div>
+      <div class="step"><div class="step-num" style="background:#EDE9FE;color:#5B21B6;">2</div><div class="step-body"><h5>Vendor Requests Payment</h5><p>Vendor clicks "Request Payment", selects bank account, enters amount, submits. Status: <strong>pending</strong>.</p></div></div>
+      <div class="step"><div class="step-num" style="background:#EDE9FE;color:#5B21B6;">3</div><div class="step-body"><h5>Admin/Manager Approves</h5><p>Admin reviews request, approves with amount confirmation. Status changes to <strong>approved</strong>. Vendor notified.</p></div></div>
+      <div class="step"><div class="step-num" style="background:#EDE9FE;color:#5B21B6;">4</div><div class="step-body"><h5>Admin Marks as Released</h5><p>After bank transfer, admin marks as released, adds Transfer ID and payment date. Status: <strong>released</strong>.</p></div></div>
+      <div class="step"><div class="step-num" style="background:#D1FAE5;color:#065F46;">5</div><div class="step-body"><h5>Vendor Downloads PDF Receipt</h5><p>Released payment appears in "COD Payment" tab. Vendor can download PDF with full order breakdown.</p></div></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="col2">
+      <div class="ss-placeholder"><div class="ss-icon">📊</div><div class="ss-label">Vendor Dashboard</div><div class="ss-route">/vendor/dashboard</div></div>
+      <div class="ss-placeholder"><div class="ss-icon">💰</div><div class="ss-label">Vendor Payments</div><div class="ss-route">/vendor/payments</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 6. RIDER PORTAL ═══════════════════════════════ -->
+<div class="page">
+  <div class="portal-header" style="background:linear-gradient(90deg,#ECFDF5,#fff);">
+    <div class="portal-icon" style="background:#059669;color:#fff;">🏍️</div>
+    <div class="portal-title">
+      <h3>Rider Portal</h3>
+      <p>Route prefix: <code>/rider/*</code> &nbsp;·&nbsp; Role: <strong>rider</strong> &nbsp;·&nbsp; Data: assigned orders only</p>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="info-strip green">Riders are field delivery agents. They see only their assigned orders, can update delivery status at each stage, manage the physical inventory in their possession, and track commission earnings from completed deliveries.</div>
+
+    <div class="feature-grid">
+      <div class="feature-item"><div class="feature-dot" style="background:#059669;"></div><div class="feature-text"><h5>Dashboard</h5><p>Today's orders, pending pickups, deliveries completed this month, commission earned, follow-up reminders</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#059669;"></div><div class="feature-text"><h5>Orders</h5><p>List of all orders assigned to this rider. Filter by status. Tap to view full detail and update status.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#059669;"></div><div class="feature-text"><h5>Order Detail</h5><p>Customer info, package details, delivery address map link, COD amount, status history, add comment.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#059669;"></div><div class="feature-text"><h5>My Inventory</h5><p>Physical stock items currently held by the rider — assigned by admin. Track quantity, product, date assigned.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#059669;"></div><div class="feature-text"><h5>Payments — Received</h5><p>Released commission payments. Transfer ID, date, amount, order count. Download PDF commission statement.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#059669;"></div><div class="feature-text"><h5>Payments — Requests</h5><p>All submitted commission withdrawal requests with status (pending/released/rejected) and admin remarks.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#059669;"></div><div class="feature-text"><h5>Payments — Bank Accounts</h5><p>Manage bank/wallet accounts for commission payouts. Add multiple accounts.</p></div></div>
+      <div class="feature-item"><div class="feature-dot" style="background:#6B7280;"></div><div class="feature-text"><h5>Support Tickets</h5><p>Create and respond to support tickets — report issues, damaged packages, customer disputes.</p></div></div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;">Order Status Update Flow (Rider)</h4>
+    <div class="flow-wrap">
+      <svg width="760" height="100" viewBox="0 0 760 100" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="a3" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#64748B"/></marker></defs>
+        <!-- States -->
+        <rect x="5" y="30" width="90" height="35" rx="7" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1.5"/><text x="50" y="50" text-anchor="middle" font-size="9" fill="#374151" font-weight="600">PENDING</text><text x="50" y="63" text-anchor="middle" font-size="8" fill="#6B7280">Unassigned</text>
+        <line x1="95" y1="47" x2="115" y2="47" stroke="#64748B" stroke-width="1.5" marker-end="url(#a3)"/>
+        <rect x="117" y="30" width="100" height="35" rx="7" fill="#DBEAFE" stroke="#93C5FD" stroke-width="1.5"/><text x="167" y="50" text-anchor="middle" font-size="9" fill="#1D4ED8" font-weight="600">ASSIGNED</text><text x="167" y="63" text-anchor="middle" font-size="8" fill="#3B82F6">Rider assigned</text>
+        <line x1="217" y1="47" x2="237" y2="47" stroke="#64748B" stroke-width="1.5" marker-end="url(#a3)"/>
+        <rect x="239" y="30" width="100" height="35" rx="7" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/><text x="289" y="50" text-anchor="middle" font-size="9" fill="#92400E" font-weight="600">PICKED UP</text><text x="289" y="63" text-anchor="middle" font-size="8" fill="#B45309">Rider scans</text>
+        <line x1="339" y1="47" x2="359" y2="47" stroke="#64748B" stroke-width="1.5" marker-end="url(#a3)"/>
+        <rect x="361" y="30" width="100" height="35" rx="7" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/><text x="411" y="50" text-anchor="middle" font-size="9" fill="#92400E" font-weight="600">IN TRANSIT</text><text x="411" y="63" text-anchor="middle" font-size="8" fill="#B45309">On the way</text>
+        <line x1="461" y1="47" x2="481" y2="47" stroke="#64748B" stroke-width="1.5" marker-end="url(#a3)"/>
+        <rect x="483" y="10" width="90" height="35" rx="7" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1.5"/><text x="528" y="30" text-anchor="middle" font-size="9" fill="#065F46" font-weight="600">DELIVERED</text><text x="528" y="43" text-anchor="middle" font-size="8" fill="#059669">COD collected</text>
+        <line x1="530" y1="45" x2="530" y2="55" stroke="#64748B" stroke-width="1" stroke-dasharray="3 2"/>
+        <rect x="483" y="55" width="90" height="35" rx="7" fill="#FEE2E2" stroke="#FCA5A5" stroke-width="1.5"/><text x="528" y="73" text-anchor="middle" font-size="9" fill="#991B1B" font-weight="600">RETURNED</text><text x="528" y="86" text-anchor="middle" font-size="8" fill="#DC2626">Not delivered</text>
+        <line x1="573" y1="47" x2="593" y2="47" stroke="#64748B" stroke-width="1.5" marker-end="url(#a3)"/>
+        <rect x="595" y="30" width="100" height="35" rx="7" fill="#EDE9FE" stroke="#C4B5FD" stroke-width="1.5"/><text x="645" y="47" text-anchor="middle" font-size="9" fill="#5B21B6" font-weight="600">COMMISSION</text><text x="645" y="60" text-anchor="middle" font-size="8" fill="#7C3AED">Auto-generated</text>
+        <text x="4" y="18" font-size="8" fill="#94A3B8">Admin assigns →</text>
+        <text x="240" y="18" font-size="8" fill="#94A3B8">← Rider updates →                         Admin resolves</text>
+      </svg>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;">Commission PDF Statement</h4>
+    <div class="info-strip green">When a rider's payment is released, they can download a PDF Commission Statement showing: rider name, reference ID, payment date, bank account, and a full breakdown table of all orders in that payment (order code, customer name, product, commission amount, total).</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 7. SYSTEM FLOWCHARTS ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#FEF3C7;color:#92400E;">SECTION 7</span>
+    <h2>System Flowcharts</h2>
+    <p>End-to-end process flows — order lifecycle, payment processing, duplicate check</p>
+  </div>
+  <div class="sec-body">
+
+    <!-- Order Lifecycle Flowchart -->
+    <h4 style="font-size:.9rem;font-weight:700;margin-bottom:8px;">7.1 — Full Order Lifecycle (Order Creation → Delivery → Payment)</h4>
+    <div class="flow-wrap">
+      <svg width="820" height="460" viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="af" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#6B7280"/></marker>
+          <filter id="sf"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
+        </defs>
+
+        <!-- Lane labels -->
+        <rect x="0" y="0" width="820" height="20" fill="#F8FAFC"/>
+        <rect x="0" y="0" width="140" height="460" fill="#F5F3FF" opacity="0.4"/>
+        <rect x="140" y="0" width="160" height="460" fill="#EFF6FF" opacity="0.4"/>
+        <rect x="300" y="0" width="220" height="460" fill="#ECFDF5" opacity="0.4"/>
+        <rect x="520" y="0" width="160" height="460" fill="#FEF3C7" opacity="0.3"/>
+        <rect x="680" y="0" width="140" height="460" fill="#FFF1F2" opacity="0.4"/>
+
+        <text x="70" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#7C3AED">VENDOR</text>
+        <text x="220" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#1D4ED8">ADMIN/MANAGER</text>
+        <text x="410" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#059669">RIDER</text>
+        <text x="600" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#D97706">SYSTEM AUTO</text>
+        <text x="750" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#DC2626">PAYMENT</text>
+
+        <!-- Step 1: Create Order -->
+        <rect x="15" y="30" width="110" height="36" rx="7" fill="#7C3AED" filter="url(#sf)"/>
+        <text x="70" y="50" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">Create Order</text>
+        <text x="70" y="62" text-anchor="middle" font-size="8" fill="#DDD6FE">Single or Bulk</text>
+
+        <!-- Arrow down -->
+        <line x1="70" y1="66" x2="70" y2="90" stroke="#7C3AED" stroke-width="1.5" marker-end="url(#af)"/>
+
+        <!-- Step 2: Duplicate check (system) -->
+        <polygon points="70,90 110,112 70,134 30,112" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5" filter="url(#sf)"/>
+        <text x="70" y="109" text-anchor="middle" font-size="8.5" fill="#92400E" font-weight="700">Duplicate</text>
+        <text x="70" y="121" text-anchor="middle" font-size="8.5" fill="#92400E">Check?</text>
+
+        <!-- Yes → Flagged -->
+        <line x1="110" y1="112" x2="155" y2="112" stroke="#D97706" stroke-width="1.5" marker-end="url(#af)"/>
+        <text x="133" y="108" text-anchor="middle" font-size="8" fill="#D97706">Flagged</text>
+        <rect x="155" y="96" width="120" height="32" rx="7" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/>
+        <text x="215" y="113" text-anchor="middle" font-size="8.5" fill="#92400E" font-weight="700">Duplicate Review</text>
+        <text x="215" y="124" text-anchor="middle" font-size="8" fill="#B45309">Admin confirms/dismisses</text>
+        <!-- No → continue -->
+        <line x1="70" y1="134" x2="70" y2="155" stroke="#6B7280" stroke-width="1.5" marker-end="url(#af)"/>
+        <text x="82" y="148" font-size="8" fill="#6B7280">Clear</text>
+
+        <!-- Step 3: Order in system - status PENDING -->
+        <rect x="15" y="157" width="110" height="36" rx="7" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1.5"/>
+        <text x="70" y="175" text-anchor="middle" font-size="9" fill="#374151" font-weight="700">Order: PENDING</text>
+        <text x="70" y="187" text-anchor="middle" font-size="8" fill="#6B7280">Visible to admin</text>
+
+        <!-- Arrow to admin -->
+        <line x1="125" y1="175" x2="155" y2="175" stroke="#6B7280" stroke-width="1.5" marker-end="url(#af)"/>
+
+        <!-- Step 4: Admin assigns rider -->
+        <rect x="155" y="157" width="130" height="36" rx="7" fill="#1D4ED8" filter="url(#sf)"/>
+        <text x="220" y="175" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">Assign to Rider</text>
+        <text x="220" y="187" text-anchor="middle" font-size="8" fill="#BFDBFE">Assign Orders page</text>
+
+        <!-- Arrow to rider -->
+        <line x1="285" y1="175" x2="315" y2="175" stroke="#6B7280" stroke-width="1.5" marker-end="url(#af)"/>
+
+        <!-- Step 5: Rider notified + picks up -->
+        <rect x="317" y="157" width="180" height="36" rx="7" fill="#059669" filter="url(#sf)"/>
+        <text x="407" y="175" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">Order: ASSIGNED → PICKED UP</text>
+        <text x="407" y="187" text-anchor="middle" font-size="8" fill="#A7F3D0">Rider gets notification</text>
+
+        <!-- Arrow down -->
+        <line x1="407" y1="193" x2="407" y2="213" stroke="#059669" stroke-width="1.5" marker-end="url(#af)"/>
+
+        <!-- Step 6: In Transit -->
+        <rect x="317" y="215" width="180" height="36" rx="7" fill="#D97706" filter="url(#sf)"/>
+        <text x="407" y="233" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">Order: IN TRANSIT</text>
+        <text x="407" y="245" text-anchor="middle" font-size="8" fill="#FDE68A">Rider updates on route</text>
+
+        <!-- Decision: Delivered? -->
+        <line x1="407" y1="251" x2="407" y2="271" stroke="#6B7280" stroke-width="1.5" marker-end="url(#af)"/>
+        <polygon points="407,271 447,293 407,315 367,293" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1.5"/>
+        <text x="407" y="290" text-anchor="middle" font-size="8.5" fill="#166534" font-weight="700">Delivered?</text>
+        <text x="407" y="302" text-anchor="middle" font-size="8" fill="#166534">COD collected?</text>
+
+        <!-- Yes delivered -->
+        <line x1="447" y1="293" x2="525" y2="293" stroke="#059669" stroke-width="1.5" marker-end="url(#af)"/>
+        <text x="488" y="289" text-anchor="middle" font-size="8" fill="#059669">Yes</text>
+        <rect x="527" y="275" width="130" height="36" rx="7" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1.5"/>
+        <text x="592" y="293" text-anchor="middle" font-size="9" fill="#065F46" font-weight="700">Order: DELIVERED</text>
+        <text x="592" y="305" text-anchor="middle" font-size="8" fill="#059669">COD recorded</text>
+
+        <!-- No - return -->
+        <line x1="367" y1="293" x2="317" y2="293" stroke="#DC2626" stroke-width="1.5" marker-end="url(#af)"/>
+        <text x="342" y="289" text-anchor="middle" font-size="8" fill="#DC2626">No</text>
+        <rect x="210" y="275" width="105" height="36" rx="7" fill="#FEE2E2" stroke="#FCA5A5" stroke-width="1.5"/>
+        <text x="262" y="293" text-anchor="middle" font-size="8.5" fill="#991B1B" font-weight="700">RETURNED</text>
+        <text x="262" y="305" text-anchor="middle" font-size="8" fill="#DC2626">Rider adds note</text>
+
+        <!-- Commission auto-gen -->
+        <line x1="657" y1="293" x2="680" y2="293" stroke="#D97706" stroke-width="1.5" marker-end="url(#af)"/>
+        <rect x="682" y="275" width="128" height="36" rx="7" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/>
+        <text x="746" y="291" text-anchor="middle" font-size="8.5" fill="#92400E" font-weight="700">Auto: Commission</text>
+        <text x="746" y="303" text-anchor="middle" font-size="8" fill="#B45309">Generated for rider</text>
+
+        <!-- COD to vendor -->
+        <line x1="592" y1="311" x2="592" y2="340" stroke="#059669" stroke-width="1.5" marker-end="url(#af)"/>
+        <rect x="527" y="342" width="130" height="36" rx="7" fill="#F5F3FF" stroke="#C4B5FD" stroke-width="1.5"/>
+        <text x="592" y="360" text-anchor="middle" font-size="8.5" fill="#5B21B6" font-weight="700">COD → Vendor Balance</text>
+        <text x="592" y="372" text-anchor="middle" font-size="8" fill="#7C3AED">Pending release</text>
+
+        <!-- Payment request flow -->
+        <line x1="592" y1="378" x2="592" y2="400" stroke="#7C3AED" stroke-width="1.5" marker-end="url(#af)"/>
+        <rect x="527" y="402" width="130" height="36" rx="7" fill="#DC2626" filter="url(#sf)"/>
+        <text x="592" y="419" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">Vendor Requests</text>
+        <text x="592" y="431" text-anchor="middle" font-size="8" fill="#FEE2E2">Admin Approves → Releases</text>
+
+        <!-- Labels -->
+        <text x="15" y="450" font-size="8" fill="#7C3AED">● Vendor action</text>
+        <text x="155" y="450" font-size="8" fill="#1D4ED8">● Admin action</text>
+        <text x="315" y="450" font-size="8" fill="#059669">● Rider action</text>
+        <text x="525" y="450" font-size="8" fill="#D97706">● Auto / System</text>
+        <text x="685" y="450" font-size="8" fill="#DC2626">● Payment flow</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 7b. MORE FLOWCHARTS ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#FEF3C7;color:#92400E;">SECTION 7 cont.</span>
+    <h2>Payment &amp; Duplicate Check Flows</h2>
+  </div>
+  <div class="sec-body">
+
+    <h4 style="font-size:.9rem;font-weight:700;margin-bottom:8px;">7.2 — Vendor &amp; Rider Payment Flow</h4>
+    <div class="flow-wrap">
+      <svg width="820" height="230" viewBox="0 0 820 230" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="ap" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#6B7280"/></marker></defs>
+
+        <!-- VENDOR ROW -->
+        <text x="10" y="30" font-size="9" font-weight="700" fill="#7C3AED">VENDOR PAYMENT</text>
+        <rect x="10" y="38" width="110" height="36" rx="7" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1.5"/>
+        <text x="65" y="55" text-anchor="middle" font-size="8.5" fill="#065F46" font-weight="700">Order Delivered</text>
+        <text x="65" y="68" text-anchor="middle" font-size="8" fill="#059669">COD added to balance</text>
+        <line x1="120" y1="56" x2="145" y2="56" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="147" y="38" width="115" height="36" rx="7" fill="#EDE9FE" stroke="#C4B5FD" stroke-width="1.5"/>
+        <text x="204" y="55" text-anchor="middle" font-size="8.5" fill="#5B21B6" font-weight="700">Vendor Requests</text>
+        <text x="204" y="68" text-anchor="middle" font-size="8" fill="#7C3AED">Selects bank + amount</text>
+        <line x1="262" y1="56" x2="287" y2="56" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="289" y="38" width="100" height="36" rx="7" fill="#DBEAFE" stroke="#93C5FD" stroke-width="1.5"/>
+        <text x="339" y="55" text-anchor="middle" font-size="8.5" fill="#1D4ED8" font-weight="700">Admin: PENDING</text>
+        <text x="339" y="68" text-anchor="middle" font-size="8" fill="#3B82F6">Reviews request</text>
+        <line x1="389" y1="56" x2="414" y2="56" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="416" y="38" width="100" height="36" rx="7" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/>
+        <text x="466" y="55" text-anchor="middle" font-size="8.5" fill="#92400E" font-weight="700">Admin: APPROVED</text>
+        <text x="466" y="68" text-anchor="middle" font-size="8" fill="#B45309">Confirms amount</text>
+        <line x1="516" y1="56" x2="541" y2="56" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="543" y="38" width="115" height="36" rx="7" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1.5"/>
+        <text x="600" y="55" text-anchor="middle" font-size="8.5" fill="#065F46" font-weight="700">Bank Transfer Done</text>
+        <text x="600" y="68" text-anchor="middle" font-size="8" fill="#059669">Ref ID + date added</text>
+        <line x1="658" y1="56" x2="683" y2="56" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="685" y="38" width="120" height="36" rx="7" fill="#059669"/>
+        <text x="745" y="55" text-anchor="middle" font-size="8.5" fill="#fff" font-weight="700">RELEASED + PDF</text>
+        <text x="745" y="68" text-anchor="middle" font-size="8" fill="#A7F3D0">Vendor downloads receipt</text>
+
+        <!-- RIDER ROW -->
+        <text x="10" y="120" font-size="9" font-weight="700" fill="#059669">RIDER COMMISSION</text>
+        <rect x="10" y="128" width="110" height="36" rx="7" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1.5"/>
+        <text x="65" y="145" text-anchor="middle" font-size="8.5" fill="#065F46" font-weight="700">Order Delivered</text>
+        <text x="65" y="158" text-anchor="middle" font-size="8" fill="#059669">Commission auto-created</text>
+        <line x1="120" y1="146" x2="145" y2="146" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="147" y="128" width="120" height="36" rx="7" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1.5"/>
+        <text x="207" y="145" text-anchor="middle" font-size="8.5" fill="#065F46" font-weight="700">Rider Requests Payout</text>
+        <text x="207" y="158" text-anchor="middle" font-size="8" fill="#059669">Selects bank + amount</text>
+        <line x1="267" y1="146" x2="292" y2="146" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="294" y="128" width="110" height="36" rx="7" fill="#DBEAFE" stroke="#93C5FD" stroke-width="1.5"/>
+        <text x="349" y="145" text-anchor="middle" font-size="8.5" fill="#1D4ED8" font-weight="700">Admin Reviews</text>
+        <text x="349" y="158" text-anchor="middle" font-size="8" fill="#3B82F6">Approve or reject</text>
+        <line x1="404" y1="146" x2="429" y2="146" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="431" y="128" width="120" height="36" rx="7" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1.5"/>
+        <text x="491" y="145" text-anchor="middle" font-size="8.5" fill="#065F46" font-weight="700">Mark Released</text>
+        <text x="491" y="158" text-anchor="middle" font-size="8" fill="#059669">Ref ID entered</text>
+        <line x1="551" y1="146" x2="576" y2="146" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ap)"/>
+
+        <rect x="578" y="128" width="225" height="36" rx="7" fill="#059669"/>
+        <text x="690" y="145" text-anchor="middle" font-size="8.5" fill="#fff" font-weight="700">Rider: Received + Commission PDF</text>
+        <text x="690" y="158" text-anchor="middle" font-size="8" fill="#A7F3D0">Full order breakdown downloadable</text>
+
+        <text x="10" y="200" font-size="8" fill="#6B7280">Note: Both flows send in-app notifications at each status change. Admin also receives notification when new payment requests are submitted.</text>
+      </svg>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.9rem;font-weight:700;margin-bottom:8px;">7.3 — Duplicate Order Detection Flow</h4>
+    <div class="flow-wrap">
+      <svg width="820" height="160" viewBox="0 0 820 160" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="ad" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#6B7280"/></marker></defs>
+        <rect x="10" y="55" width="120" height="40" rx="7" fill="#7C3AED"/>
+        <text x="70" y="74" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">Order Submitted</text>
+        <text x="70" y="87" text-anchor="middle" font-size="8" fill="#DDD6FE">Vendor or Admin</text>
+        <line x1="130" y1="75" x2="155" y2="75" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ad)"/>
+
+        <rect x="157" y="40" width="145" height="70" rx="7" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+        <text x="229" y="60" text-anchor="middle" font-size="9" fill="#1F2937" font-weight="700">System Checks DB</text>
+        <text x="229" y="75" text-anchor="middle" font-size="8" fill="#6B7280">Same phone number +</text>
+        <text x="229" y="87" text-anchor="middle" font-size="8" fill="#6B7280">same delivery address</text>
+        <text x="229" y="99" text-anchor="middle" font-size="8" fill="#6B7280">within recent orders</text>
+        <line x1="302" y1="75" x2="327" y2="75" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ad)"/>
+
+        <polygon points="370,50 415,75 370,100 325,75" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/>
+        <text x="370" y="72" text-anchor="middle" font-size="8.5" fill="#92400E" font-weight="700">Match</text>
+        <text x="370" y="84" text-anchor="middle" font-size="8.5" fill="#92400E">Found?</text>
+
+        <!-- Yes - flag -->
+        <line x1="415" y1="75" x2="455" y2="75" stroke="#DC2626" stroke-width="1.5" marker-end="url(#ad)"/>
+        <text x="435" y="71" font-size="8" fill="#DC2626">Yes</text>
+        <rect x="457" y="55" width="140" height="40" rx="7" fill="#FEE2E2" stroke="#FCA5A5" stroke-width="1.5"/>
+        <text x="527" y="73" text-anchor="middle" font-size="9" fill="#991B1B" font-weight="700">Flagged as Duplicate</text>
+        <text x="527" y="86" text-anchor="middle" font-size="8" fill="#DC2626">Order still created. Pending review.</text>
+        <line x1="597" y1="75" x2="627" y2="75" stroke="#D97706" stroke-width="1.5" marker-end="url(#ad)"/>
+        <rect x="629" y="55" width="175" height="40" rx="7" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1.5"/>
+        <text x="716" y="73" text-anchor="middle" font-size="9" fill="#92400E" font-weight="700">Duplicate Review Page</text>
+        <text x="716" y="86" text-anchor="middle" font-size="8" fill="#B45309">Admin: Confirm or Dismiss</text>
+
+        <!-- No - continue -->
+        <line x1="370" y1="100" x2="370" y2="128" stroke="#059669" stroke-width="1.5" marker-end="url(#ad)"/>
+        <text x="382" y="118" font-size="8" fill="#059669">No</text>
+        <rect x="315" y="130" width="110" height="24" rx="6" fill="#D1FAE5" stroke="#6EE7B7" stroke-width="1.5"/>
+        <text x="370" y="145" text-anchor="middle" font-size="8.5" fill="#065F46" font-weight="700">Order Created — PENDING</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 8. PERMISSION MATRIX ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#D1FAE5;color:#065F46;">SECTION 8</span>
+    <h2>Permission Matrix</h2>
+    <p>Complete role-based access control (RBAC) — every module and action by every role</p>
+  </div>
+  <div class="sec-body">
+    <div class="legend">
+      <span style="color:#059669;font-size:.78rem;font-weight:700;">✔ Full access</span>&emsp;
+      <span style="color:#D97706;font-size:.78rem;font-weight:700;">◑ Partial/limited</span>&emsp;
+      <span style="color:#D1D5DB;font-size:.78rem;font-weight:700;">✗ No access</span>
+    </div>
+    <table class="perm-table">
+      <thead>
+        <tr>
+          <th style="width:200px;">Module / Action</th>
+          <th class="center">Admin</th>
+          <th class="center">Manager</th>
+          <th class="center">Staff</th>
+          <th class="center">Vendor</th>
+          <th class="center">Rider</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="6" style="background:#1F2937;color:#fff;font-size:.75rem;font-weight:700;padding:6px 10px;">ORDERS</td></tr>
+        <tr><td>View all orders</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>View own orders</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔ (assigned)</td></tr>
+        <tr><td>Create single order</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td></tr>
+        <tr><td>Bulk upload orders</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center check">✔</td><td class="center cross">✗</td></tr>
+        <tr><td>Edit order details</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Delete order</td><td class="center check">✔</td><td class="center partial">◑ unassigned</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Assign rider to order</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Update order status</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center check">✔ (own)</td></tr>
+        <tr><td>Add order comment</td><td class="center check">✔</td><td class="center check">✔</td><td class="center partial">◑ view</td><td class="center partial">◑ view</td><td class="center check">✔ (own)</td></tr>
+        <tr><td>Review duplicate orders</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td colspan="6" style="background:#1F2937;color:#fff;font-size:.75rem;font-weight:700;padding:6px 10px;">USERS &amp; PROFILES</td></tr>
+        <tr><td>Create user</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Edit user</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Delete user</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Reset any password</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Change own password</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td></tr>
+        <tr><td colspan="6" style="background:#1F2937;color:#fff;font-size:.75rem;font-weight:700;padding:6px 10px;">VENDORS &amp; RIDERS</td></tr>
+        <tr><td>Create/edit vendor</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Delete vendor</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Create/edit rider</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Delete rider</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Manage stations</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td colspan="6" style="background:#1F2937;color:#fff;font-size:.75rem;font-weight:700;padding:6px 10px;">PAYMENTS &amp; FINANCE</td></tr>
+        <tr><td>Submit vendor payment request</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center check">✔</td><td class="center cross">✗</td></tr>
+        <tr><td>Approve vendor payment</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Release vendor payment</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Submit rider commission request</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center check">✔</td></tr>
+        <tr><td>Release rider payment</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>View payment history</td><td class="center check">✔ all</td><td class="center check">✔ all</td><td class="center cross">✗</td><td class="center check">✔ own</td><td class="center check">✔ own</td></tr>
+        <tr><td>Manage corporate bank accounts</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>Manage own bank accounts</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center check">✔</td><td class="center check">✔</td></tr>
+        <tr><td>Download payment PDF</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center check">✔</td><td class="center check">✔</td></tr>
+        <tr><td colspan="6" style="background:#1F2937;color:#fff;font-size:.75rem;font-weight:700;padding:6px 10px;">INVENTORY &amp; STOCK</td></tr>
+        <tr><td>Create/manage stock</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center partial">◑ own</td><td class="center cross">✗</td></tr>
+        <tr><td>Assign stock to rider</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>View rider inventory</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center check">✔ own</td></tr>
+        <tr><td>Return stock from rider</td><td class="center check">✔</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td colspan="6" style="background:#1F2937;color:#fff;font-size:.75rem;font-weight:700;padding:6px 10px;">SYSTEM &amp; REPORTING</td></tr>
+        <tr><td>View audit logs</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>System settings (branding)</td><td class="center check">✔</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td><td class="center cross">✗</td></tr>
+        <tr><td>View dashboard analytics</td><td class="center check">✔ all</td><td class="center check">✔ all</td><td class="center partial">◑ basic</td><td class="center check">✔ own</td><td class="center check">✔ own</td></tr>
+        <tr><td>View vendor reports</td><td class="center check">✔ all</td><td class="center check">✔ all</td><td class="center cross">✗</td><td class="center check">✔ own</td><td class="center cross">✗</td></tr>
+        <tr><td>Support tickets</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td></tr>
+        <tr><td>Notifications</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td><td class="center check">✔</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 9. API REFERENCE ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#EDE9FE;color:#5B21B6;">SECTION 9</span>
+    <h2>API Reference</h2>
+    <p>Core REST endpoints — base URL: <code>https://logisticshub.replit.app/api</code></p>
+  </div>
+  <div class="sec-body">
+    <table class="perm-table">
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th><th>Access</th></tr></thead>
+      <tbody>
+        <tr><td colspan="4" style="background:#1F2937;color:#fff;font-size:.75rem;padding:5px 10px;font-weight:700;">Authentication</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/auth/login</code></td><td>Login — returns JWT token + user profile + role</td><td>Public</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/auth/me</code></td><td>Current authenticated user profile</td><td>All</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/auth/change-password</code></td><td>Change own password</td><td>All</td></tr>
+        <tr><td colspan="4" style="background:#1F2937;color:#fff;font-size:.75rem;padding:5px 10px;font-weight:700;">Orders</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/orders</code></td><td>Paginated orders list (role-filtered), supports search, status, date filters</td><td>All</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/orders</code></td><td>Create single order with duplicate detection</td><td>Admin, Manager, Staff, Vendor</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/orders/bulk</code></td><td>Bulk order creation from array</td><td>Admin, Manager, Vendor</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/orders/:id</code></td><td>Full order detail with history, comments, rider info</td><td>All (role-filtered)</td></tr>
+        <tr><td><span style="color:#D97706;font-weight:700;">PATCH</span></td><td><code>/orders/:id</code></td><td>Update order fields</td><td>Admin, Manager</td></tr>
+        <tr><td><span style="color:#DC2626;font-weight:700;">DELETE</span></td><td><code>/orders/:id</code></td><td>Delete unassigned order</td><td>Admin, Manager</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/orders/:id/assign</code></td><td>Assign rider to order, triggers notification</td><td>Admin, Manager</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/orders/:id/status</code></td><td>Update delivery status; auto-creates commission on delivery</td><td>Admin, Manager, Rider</td></tr>
+        <tr><td colspan="4" style="background:#1F2937;color:#fff;font-size:.75rem;padding:5px 10px;font-weight:700;">Vendor Payments</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/payment-requests</code></td><td>List payment requests (role-filtered)</td><td>Admin, Manager, Vendor</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/payment-requests</code></td><td>Submit new withdrawal request, links COD orders</td><td>Vendor</td></tr>
+        <tr><td><span style="color:#D97706;font-weight:700;">PATCH</span></td><td><code>/payment-requests/:id</code></td><td>Approve or release payment, sends notification</td><td>Admin, Manager</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/payment-requests/:id/orders</code></td><td>Orders included in this payment request (for PDF)</td><td>Admin, Manager, Vendor</td></tr>
+        <tr><td colspan="4" style="background:#1F2937;color:#fff;font-size:.75rem;padding:5px 10px;font-weight:700;">Rider Commissions &amp; Payments</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/rider-commissions</code></td><td>Commission earnings summary + balance</td><td>Rider</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/rider-payment-requests</code></td><td>Rider's payment requests with commission breakdown</td><td>Admin, Manager, Rider</td></tr>
+        <tr><td><span style="color:#059669;font-weight:700;">POST</span></td><td><code>/rider-payment-requests</code></td><td>Submit rider commission withdrawal</td><td>Rider</td></tr>
+        <tr><td><span style="color:#D97706;font-weight:700;">PATCH</span></td><td><code>/rider-payment-requests/:id</code></td><td>Release or reject rider payment</td><td>Admin, Manager</td></tr>
+        <tr><td colspan="4" style="background:#1F2937;color:#fff;font-size:.75rem;padding:5px 10px;font-weight:700;">Dashboard</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/dashboard/admin-summary</code></td><td>Admin KPIs: orders, COD, vendors, riders, open tickets</td><td>Admin, Manager</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/dashboard/vendor-summary</code></td><td>Vendor KPIs: own orders by status, COD pending/released</td><td>Vendor</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/dashboard/rider-summary</code></td><td>Rider KPIs: today orders, earnings, follow-ups</td><td>Rider</td></tr>
+        <tr><td><span style="color:#6B7280;font-weight:700;">GET</span></td><td><code>/dashboard/cod-summary</code></td><td>COD collected / pending release / released (role-filtered)</td><td>Admin, Manager, Vendor</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ 10. DATA MODELS ═══════════════════════════════ -->
+<div class="page">
+  <div class="sec-header">
+    <span class="sec-tag" style="background:#D1FAE5;color:#065F46;">SECTION 10</span>
+    <h2>Key Data Models</h2>
+    <p>Core database tables, fields, and relationships</p>
+  </div>
+  <div class="sec-body">
+    <div class="col2">
+      <div>
+        <div class="card" style="border-top:3px solid #1D4ED8;margin-bottom:10px;">
+          <h4>orders</h4>
+          <p>id, orderCode (unique), vendorId, riderId, stationId, customerName, customerPhone, deliveryAddress, productName, codAmount, deliveryCharge, paymentReleaseStatus, paymentRequestId, isDuplicate, status, createdAt</p>
+        </div>
+        <div class="card" style="border-top:3px solid #7C3AED;margin-bottom:10px;">
+          <h4>users</h4>
+          <p>id, email, passwordHash, name, role (admin/manager/staff/vendor/rider), stationId, isActive, createdAt</p>
+        </div>
+        <div class="card" style="border-top:3px solid #059669;margin-bottom:10px;">
+          <h4>riders</h4>
+          <p>id, userId, name, phone, stationId, coverageArea, commissionRate, status, createdAt</p>
+        </div>
+        <div class="card" style="border-top:3px solid #DC2626;margin-bottom:10px;">
+          <h4>payment_requests</h4>
+          <p>id, vendorId, bankAccountId, requestedAmount, approvedAmount, status (pending/approved/released/rejected), referenceId, paymentDate, walletMethod, adminNote, createdAt</p>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="border-top:3px solid #D97706;margin-bottom:10px;">
+          <h4>order_status_history</h4>
+          <p>id, orderId, status, changedBy, note, createdAt — Immutable log of every status change on an order</p>
+        </div>
+        <div class="card" style="border-top:3px solid #BE185D;margin-bottom:10px;">
+          <h4>rider_commissions</h4>
+          <p>id, riderId, orderId, amount, status (pending/released), paymentRequestId, createdAt — Auto-created on each delivery</p>
+        </div>
+        <div class="card" style="border-top:3px solid #0D9488;margin-bottom:10px;">
+          <h4>notifications</h4>
+          <p>id, userId, title, message, type, relatedId, isRead, createdAt — In-app notifications for all events</p>
+        </div>
+        <div class="card" style="border-top:3px solid #6B7280;margin-bottom:10px;">
+          <h4>audit_logs</h4>
+          <p>id, userId, action, entity, entityId, previousData (JSON), newData (JSON), ipAddress, createdAt — Admin-only full audit trail</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:.88rem;font-weight:700;margin-bottom:10px;">Entity Relationship Summary</h4>
+    <div class="flow-wrap">
+      <svg width="780" height="180" viewBox="0 0 780 180" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="er" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#94A3B8"/></marker></defs>
+        <!-- users -->
+        <rect x="10" y="70" width="80" height="40" rx="7" fill="#1F2937"/><text x="50" y="91" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">users</text><text x="50" y="103" text-anchor="middle" font-size="8" fill="#9CA3AF">role</text>
+        <!-- vendors -->
+        <rect x="120" y="20" width="80" height="40" rx="7" fill="#7C3AED"/><text x="160" y="41" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">vendors</text><text x="160" y="53" text-anchor="middle" font-size="8" fill="#DDD6FE">userId FK</text>
+        <!-- riders -->
+        <rect x="120" y="120" width="80" height="40" rx="7" fill="#059669"/><text x="160" y="141" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">riders</text><text x="160" y="153" text-anchor="middle" font-size="8" fill="#A7F3D0">userId FK</text>
+        <!-- orders -->
+        <rect x="250" y="65" width="100" height="50" rx="7" fill="#1D4ED8"/><text x="300" y="86" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">orders</text><text x="300" y="100" text-anchor="middle" font-size="8" fill="#BFDBFE">vendorId, riderId</text><text x="300" y="112" text-anchor="middle" font-size="8" fill="#BFDBFE">stationId FKs</text>
+        <!-- stations -->
+        <rect x="250" y="20" width="80" height="35" rx="7" fill="#0D9488"/><text x="290" y="41" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">stations</text>
+        <!-- payment_requests -->
+        <rect x="400" y="20" width="110" height="40" rx="7" fill="#DC2626"/><text x="455" y="40" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">payment_requests</text><text x="455" y="52" text-anchor="middle" font-size="8" fill="#FCA5A5">vendorId FK</text>
+        <!-- bank_accounts -->
+        <rect x="400" y="70" width="100" height="35" rx="7" fill="#374151"/><text x="450" y="90" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">bank_accounts</text><text x="450" y="102" text-anchor="middle" font-size="8" fill="#D1D5DB">vendorId FK</text>
+        <!-- rider_commissions -->
+        <rect x="400" y="115" width="115" height="35" rx="7" fill="#374151"/><text x="457" y="135" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">rider_commissions</text><text x="457" y="147" text-anchor="middle" font-size="8" fill="#D1D5DB">orderId, riderId FKs</text>
+        <!-- notifications -->
+        <rect x="560" y="20" width="100" height="35" rx="7" fill="#6B7280"/><text x="610" y="40" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">notifications</text><text x="610" y="52" text-anchor="middle" font-size="8" fill="#E5E7EB">userId FK</text>
+        <!-- audit_logs -->
+        <rect x="560" y="70" width="100" height="35" rx="7" fill="#6B7280"/><text x="610" y="90" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="700">audit_logs</text><text x="610" y="102" text-anchor="middle" font-size="8" fill="#E5E7EB">userId FK</text>
+        <!-- rider_inventory -->
+        <rect x="560" y="120" width="100" height="35" rx="7" fill="#374151"/><text x="610" y="140" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">rider_inventory</text><text x="610" y="152" text-anchor="middle" font-size="8" fill="#D1D5DB">riderId, stockId</text>
+
+        <!-- Connectors -->
+        <line x1="90" y1="82" x2="120" y2="40" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="90" y1="105" x2="120" y2="140" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="200" y1="40" x2="250" y2="80" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="200" y1="140" x2="250" y2="110" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="350" y1="80" x2="400" y2="40" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="350" y1="90" x2="400" y2="87" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="350" y1="105" x2="400" y2="130" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="510" y1="40" x2="560" y2="37" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="510" y1="87" x2="560" y2="87" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="515" y1="132" x2="560" y2="137" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+        <line x1="290" y1="55" x2="290" y2="65" stroke="#94A3B8" stroke-width="1" marker-end="url(#er)"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ FINAL SUMMARY ═══════════════════════════════ -->
+<div class="page" style="background:linear-gradient(135deg,#F8FAFC,#EFF6FF);">
+  <div class="sec-header">
+    <h2>System Summary</h2>
+    <p>SwiftShip — Key capabilities and architectural decisions</p>
+  </div>
+  <div class="sec-body">
+    <div class="col3">
+      <div class="highlight" style="background:#FEF2F2;">
+        <h5 style="color:#DC2626;">Security</h5>
+        <ul>
+          <li>JWT-based stateless auth</li>
+          <li>Role guards on all API routes</li>
+          <li>Immutable audit log trail</li>
+          <li>Data isolation per vendor/rider</li>
+          <li>Password hashing (bcrypt)</li>
+        </ul>
+      </div>
+      <div class="highlight" style="background:#DBEAFE;">
+        <h5 style="color:#1D4ED8;">Scalability</h5>
+        <ul>
+          <li>Stateless REST API</li>
+          <li>Paginated order queries</li>
+          <li>Role-based data filtering at API layer</li>
+          <li>Drizzle ORM — typed SQL</li>
+          <li>pnpm monorepo structure</li>
+        </ul>
+      </div>
+      <div class="highlight" style="background:#D1FAE5;">
+        <h5 style="color:#059669;">User Experience</h5>
+        <ul>
+          <li>Real-time in-app notifications</li>
+          <li>Bulk order CSV/Excel upload</li>
+          <li>One-click PDF receipt download</li>
+          <li>Duplicate order auto-detection</li>
+          <li>Mobile-responsive UI</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="col2">
+      <div class="info-strip blue">
+        <div><strong>Live URL:</strong> <a href="https://logisticshub.replit.app">https://logisticshub.replit.app</a><br>
+        <strong>Stack:</strong> React + Vite · Express 5 · Drizzle ORM · PostgreSQL (Neon)<br>
+        <strong>Deployment:</strong> Replit Cloud · Always-on production</div>
+      </div>
+      <div class="info-strip green">
+        <div><strong>Demo Credentials:</strong><br>
+        Admin: <code>admin@swiftship.com</code> / <code>Admin@123</code><br>
+        Rider: <code>rider1@swiftship.com</code> / <code>Rider@123</code><br>
+        (Use vendor account for vendor portal)</div>
+      </div>
+    </div>
+    <p style="font-size:.75rem;color:#94A3B8;text-align:center;margin-top:24px;">SwiftShip System Documentation · Generated May 2026 · All information reflects current production build</p>
+  </div>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

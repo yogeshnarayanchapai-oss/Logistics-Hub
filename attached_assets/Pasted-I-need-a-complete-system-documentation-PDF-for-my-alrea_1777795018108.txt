@@ -1,0 +1,78 @@
+I need a complete system documentation PDF for my already-built Replit project.
+
+Please analyze the full project and create a professional PDF document that looks like a Figma-style system flow presentation.
+
+Requirements:
+
+1. Cover all portals in the system:
+- Admin Portal
+- Manager Portal
+- Vendor Portal
+- Rider Portal
+- Branch Manager Portal
+- Accountant Portal
+- Any other portal/module available in the system
+
+2. For every portal, include:
+- Portal name
+- Login/user role purpose
+- Dashboard overview
+- All sidebar/menu sections
+- What each section does
+- Step-by-step workflow
+- Important buttons/actions and their purpose
+- Data flow between sections
+- Which role can create, update, approve, reject, assign, view, or delete data
+
+3. Add screenshots:
+- Take UI screenshots of every important page/section
+- Add screenshots inside the PDF
+- Label each screenshot properly
+- Make sure screenshots are clear and not stretched
+
+4. Create Figma-style flowcharts:
+- Show how the full system works from order creation to delivery completion
+- Show portal-to-portal connection
+- Example:
+  Vendor creates order → Manager checks duplicate → Admin/Manager assigns rider → Rider updates pickup/delivery → Accountant tracks payment → Admin sees full report
+- Use boxes, arrows, colors, and clean layout like a professional Figma flow diagram
+
+5. Include separate flowcharts for:
+- User login & role access flow
+- Order creation flow
+- Duplicate order checking flow
+- Rider assignment flow
+- Pickup and delivery flow
+- Return/cancel order flow
+- Payment/accounting flow
+- Reporting/dashboard flow
+
+6. PDF structure:
+- Cover page with system name
+- Table of contents
+- System overview
+- Role & portal overview
+- Full system architecture/flowchart
+- Separate section for each portal
+- Screenshots with explanation
+- End-to-end workflow
+- Permission matrix table
+- Final summary
+
+7. Design style:
+- Professional business documentation
+- Clean white background
+- Modern cards, arrows, and section blocks
+- Use consistent colors
+- Figma-style visual flow
+- Easy for management, developer, and investor to understand
+
+8. Output:
+- Generate a downloadable PDF file
+- Also generate editable flowchart source if possible
+- Make sure the PDF is complete and properly formatted
+
+Important:
+Do not change or break any existing project code or database.
+Only analyze the system UI, routes, roles, pages, and workflows.
+If screenshots cannot be captured automatically, create a structured documentation template with screenshot placeholders and exact route/page names where screenshots should be inserted.
